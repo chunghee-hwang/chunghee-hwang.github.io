@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="황충희 - 백엔드 & DevOps 개발자 포트폴리오">
+  <title>황충희 | Backend & DevOps Developer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="#" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="#about">About</a></li>
+        <li><a href="#career">Career</a></li>
+        <li><a href="#projects">Projects</a></li>
+        <li><a href="#education">Education</a></li>
+        <li><a href="#certifications">Certifications</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-content">
+      <p class="hero-greeting">안녕하세요, 저는</p>
+      <h1 class="hero-name">황충희</h1>
+      <h2 class="hero-title">Backend & DevOps Developer</h2>
+      <p class="hero-description">
+        사용자와 운영자 관점을 모두 고려하며<br>
+        안정적이고 실용적인 시스템을 만들어갑니다.
+      </p>
+      <div class="hero-cta">
+        <a href="#career" class="btn btn-primary">경력 보기</a>
+        <a href="#contact" class="btn btn-secondary">연락하기</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- About Section -->
+  <section id="about" class="section about">
+    <div class="container">
+      <h2 class="section-title">About Me</h2>
+      <div class="about-content">
+        <div class="about-text">
+          <p>
+            사용자와 운영자의 관점 모두를 고려하며, 시스템의 안정성과 실용성을 함께 추구하는 개발자입니다.
+            백엔드 개발을 중심으로 DevOps와 데이터 인프라까지 아우르는 실무 경험을 쌓아왔습니다.
+          </p>
+          <p>
+            개발을 할 때 "이 기능은 실제로 어떻게 운영될까?", "문제가 생겼을 때 가장 먼저 불편함을 겪을 사람은 누구일까?"를 항상 고민합니다.
+            단순히 코드를 잘 짜는 것을 넘어서, 서비스가 지속적으로 잘 동작할 수 있도록 만드는 일이 진짜 개발자의 역할이라고 믿습니다.
+          </p>
+          <p>
+            팀 내에서는 API 설계, DB 모델링, 메시지 큐 구성 등 서비스의 뼈대를 만드는 역할을 맡으며,
+            기술 스택 선정과 구조 설계 방향 논의에서 적극적으로 의견을 제시합니다.
+            배포 자동화, 장애 대응 스크립트 작성, 모니터링 시스템 구축 등 개발과 운영 사이의 연결도 주도해왔습니다.
+          </p>
+        </div>
+        <div class="skills">
+          <h3>Tech Stack</h3>
+          <div class="skill-category">
+            <h4>Backend</h4>
+            <div class="skill-tags">
+              <span class="skill-tag">Java</span>
+              <span class="skill-tag">Kotlin</span>
+              <span class="skill-tag">Spring Boot</span>
+              <span class="skill-tag">Node.js</span>
+              <span class="skill-tag">JPA</span>
+              <span class="skill-tag">QueryDSL</span>
+            </div>
+          </div>
+          <div class="skill-category">
+            <h4>Infrastructure</h4>
+            <div class="skill-tags">
+              <span class="skill-tag">AWS</span>
+              <span class="skill-tag">Kubernetes</span>
+              <span class="skill-tag">Terraform</span>
+              <span class="skill-tag">Docker</span>
+            </div>
+          </div>
+          <div class="skill-category">
+            <h4>Data & Messaging</h4>
+            <div class="skill-tags">
+              <span class="skill-tag">Kafka</span>
+              <span class="skill-tag">Redis</span>
+              <span class="skill-tag">PostgreSQL</span>
+              <span class="skill-tag">Redshift</span>
+              <span class="skill-tag">MongoDB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Career Timeline Section -->
+  <section id="career" class="section career">
+    <div class="container">
+      <h2 class="section-title">Career</h2>
+
+      <div class="timeline">
+        <!-- 와이즈버즈 -->
+        <div class="timeline-item">
+          <div class="timeline-marker"></div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <div class="company-info">
+                <h3 class="company-name">(주) 와이즈버즈</h3>
+                <span class="company-period">2024.03 - 현재</span>
+              </div>
+              <div class="company-role">
+                <span class="role-title">Backend & DevOps Developer</span>
+                <span class="role-rank">선임연구원</span>
+              </div>
+            </div>
+            <p class="company-domain">광고 송출 시스템 및 어드민 플랫폼 개발</p>
+
+            <div class="projects-list">
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>예상 노출수 시스템</h4>
+                  <span class="project-period">2025.11 - 2025.12</span>
+                </div>
+                <div class="project-details">
+                  <p>광고주가 캠페인 생성 시 타겟팅 조건 기반 예상 노출수를 조회할 수 있는 End-to-End 시스템 설계 및 구축. Airflow DAG를 통해 Redshift에서 일 평균 수백만 건의 광고 로그를 집계하고, PostgreSQL에 동기화하여 실시간 API 응답 제공. DB 스키마 설계부터 배치 파이프라인, REST API까지 전 구간 단독 개발.</p>
+                  <div class="project-tech">
+                    <span>Spring Boot</span><span>Kotlin</span><span>Redshift</span><span>PostgreSQL</span><span>Airflow</span><span>Kafka</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>CloudFront 기반 트래픽 전달 구조 도입</h4>
+                  <span class="project-period">2025.09</span>
+                </div>
+                <div class="project-details">
+                  <p>Route 53 -> CloudFront -> ALB -> Kubernetes 구조로 전환. 비용 절감과 무중단 전환 달성.</p>
+                  <div class="project-tech">
+                    <span>CloudFront</span><span>ALB</span><span>Route 53</span><span>Kubernetes</span><span>Terraform</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>광고 노출 순서 메뉴 개발</h4>
+                  <span class="project-period">2025.06</span>
+                </div>
+                <div class="project-details">
+                  <p>광고주가 캠페인 내 광고 노출 순서를 직접 설정할 수 있는 어드민 기능 개발. JPA와 QueryDSL을 활용한 동적 쿼리 및 순서 변경 API 구현.</p>
+                  <div class="project-tech">
+                    <span>Kotlin</span><span>Spring Boot</span><span>JPA</span><span>QueryDSL</span><span>PostgreSQL</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>커스텀 광고 파라미터 기반 광고 선별 시스템</h4>
+                  <span class="project-period">2025.04</span>
+                </div>
+                <div class="project-details">
+                  <p>매체사별 커스텀 파라미터를 기반으로 광고를 선별하는 시스템 구축. 송출 서버의 타겟팅 로직과 어드민 설정 화면 개발.</p>
+                  <div class="project-tech">
+                    <span>Kotlin</span><span>Kafka</span><span>Spring Boot</span><span>Redshift</span><span>PostgreSQL</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>ElasticSearch 전용 EKS 노드 그룹 분리</h4>
+                  <span class="project-period">2025.03</span>
+                </div>
+                <div class="project-details">
+                  <p>ElasticSearch 워크로드를 위한 전용 EKS 노드 그룹 분리 작업. Terraform으로 인프라 코드화하여 리소스 격리 및 안정성 확보.</p>
+                  <div class="project-tech">
+                    <span>Terraform</span><span>Amazon EKS</span><span>Kubernetes</span><span>ElasticSearch</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>광고 통계 보고서 자동 생성/발송 시스템</h4>
+                  <span class="project-period">2025.02 - 2025.03</span>
+                </div>
+                <div class="project-details">
+                  <p>Airflow 기반 배치 파이프라인으로 Redshift 데이터를 집계하여 Excel 보고서 자동 생성. SES를 통한 정기 발송 및 S3 아카이빙 프로세스 구축.</p>
+                  <div class="project-tech">
+                    <span>Kotlin</span><span>Spring Boot</span><span>Redshift</span><span>S3</span><span>Airflow</span><span>SES</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>메일 발송 실패 모니터링 시스템</h4>
+                  <span class="project-period">2025.01</span>
+                </div>
+                <div class="project-details">
+                  <p>SES 메일 발송 실패 시 Slack으로 즉시 알림을 전송하는 모니터링 시스템 구축. Lambda와 SNS를 활용해 SES 바운스/컴플레인 이벤트를 실시간 감지하고 운영팀에 알림.</p>
+                  <div class="project-tech">
+                    <span>AWS Lambda</span><span>SES</span><span>SNS</span><span>Slack API</span><span>Python</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>Airflow 장애 자동 복구 시스템</h4>
+                  <span class="project-period">2024.12</span>
+                </div>
+                <div class="project-details">
+                  <p>Kubernetes 환경에서 Airflow 스케줄러/워커 장애 발생 시 자동 감지 및 복구하는 시스템 구축. Terraform으로 모니터링 인프라 구성, Shell 스크립트로 Pod 재시작 자동화.</p>
+                  <div class="project-tech">
+                    <span>Terraform</span><span>Kubernetes</span><span>Shell Script</span><span>Airflow</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>동일 광고 중복 송출 방지 정책</h4>
+                  <span class="project-period">2024.12</span>
+                </div>
+                <div class="project-details">
+                  <p>동일 사용자에게 같은 광고가 반복 노출되는 것을 방지하는 시스템 개발. Redis를 활용한 노출 이력 캐싱과 Kafka 기반 실시간 이벤트 처리로 중복 방지 로직 구현.</p>
+                  <div class="project-tech">
+                    <span>Kafka</span><span>Schema Registry</span><span>Spring Boot</span><span>Redis</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>스팟 인스턴스 종료 알림 시스템</h4>
+                  <span class="project-period">2024.09</span>
+                </div>
+                <div class="project-details">
+                  <p>AWS 스팟 인스턴스 중단 2분 전 알림을 Slack으로 전송하는 시스템. EventBridge로 EC2 스팟 중단 이벤트 감지, Lambda로 Slack 알림 발송. Terraform으로 전체 인프라 코드화.</p>
+                  <div class="project-tech">
+                    <span>Lambda</span><span>EventBridge</span><span>CloudWatch</span><span>Python</span><span>Terraform</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 구름 -->
+        <div class="timeline-item">
+          <div class="timeline-marker"></div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <div class="company-info">
+                <h3 class="company-name">(주) 구름</h3>
+                <span class="company-period">2021.03 - 2023.07 (2년 5개월)</span>
+              </div>
+              <div class="company-role">
+                <span class="role-title">Web Fullstack Developer</span>
+              </div>
+            </div>
+            <p class="company-domain">온라인 코딩 테스트 및 교육 플랫폼</p>
+
+            <div class="projects-list">
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>응시자 상태 실시간 감독 기능</h4>
+                  <span class="project-period">2022.07</span>
+                </div>
+                <div class="project-details">
+                  <p>시험 응시 중 응시자 상태(대기, 시험 중, 종료)를 실시간으로 모니터링하는 기능 개발. 감독관의 시험 운영 편의성 및 이상 징후 감지 정확도 향상.</p>
+                  <div class="project-tech">
+                    <span>Node.js</span><span>React</span><span>Amazon Chime</span><span>Socket.io</span><span>MongoDB</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>솔루션 함수 채점 문제 유형</h4>
+                  <span class="project-period">2022.06</span>
+                </div>
+                <div class="project-details">
+                  <p>기존 입출력 기반 채점에서 솔루션 함수 기반 자동 채점 기능 도입. 경쟁사 벤치마킹을 통한 경쟁력 확보 및 신규 고객사 확보 기여.</p>
+                  <div class="project-tech">
+                    <span>Node.js</span><span>React</span><span>Socket.io</span><span>MongoDB</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>파일 저장소 프록시 모듈</h4>
+                  <span class="project-period">2022.03</span>
+                </div>
+                <div class="project-details">
+                  <p>교육/시험 서비스의 파일 저장 경로를 내부/S3/외부 저장소로 유연하게 분기 처리. 민감 정보 처리 고객사의 커스터마이징 요구 수용.</p>
+                  <div class="project-tech">
+                    <span>Node.js</span><span>Amazon S3</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Side Projects Section -->
+  <section id="projects" class="section projects">
+    <div class="container">
+      <h2 class="section-title">Side Projects</h2>
+      <div class="project-cards">
+        <a href="https://youtu.be/VDcTBL0wPMQ" target="_blank" rel="noopener noreferrer" class="project-card">
+          <h3>Lifusic</h3>
+          <p>음악 관련 서비스 기획 및 개발 프로젝트</p>
+          <div class="project-tech">
+            <span>Spring Boot</span><span>Java</span><span>Kafka</span><span>Redis</span><span>Next.js</span><span>TypeScript</span><span>Docker</span>
+          </div>
+        </a>
+        <a href="https://youtu.be/jxMuPeMyQEk" target="_blank" rel="noopener noreferrer" class="project-card">
+          <h3>Code Expert</h3>
+          <p>알고리즘 문제 풀이 플랫폼 클론 코딩</p>
+          <div class="project-tech">
+            <span>Spring Boot</span><span>Spring Security</span><span>JPA</span><span>GraphQL</span><span>MySQL</span><span>AWS EC2</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Education Section -->
+  <section id="education" class="section education">
+    <div class="container">
+      <h2 class="section-title">Education</h2>
+      <div class="timeline timeline-education">
+        <div class="timeline-item">
+          <div class="timeline-marker"></div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <div class="company-info">
+                <h3 class="company-name">단국대학교</h3>
+                <span class="company-period">2013.03 - 2019.02</span>
+              </div>
+              <div class="company-role">
+                <span class="role-title">컴퓨터과학과</span>
+                <span class="role-rank">학사</span>
+              </div>
+            </div>
+            <p class="company-domain">GPA 4.02 / 4.5</p>
+            <div class="course-list">
+              <span class="course-tag">자료구조</span>
+              <span class="course-tag">알고리즘</span>
+              <span class="course-tag">운영체제</span>
+              <span class="course-tag">컴퓨터네트워크</span>
+              <span class="course-tag">컴퓨터구조</span>
+              <span class="course-tag">데이터베이스</span>
+              <span class="course-tag">객체지향프로그래밍</span>
+              <span class="course-tag">웹프로그래밍</span>
+              <span class="course-tag">네트워크프로그래밍</span>
+              <span class="course-tag">모바일프로그래밍</span>
+              <span class="course-tag">컴퓨터보안</span>
+              <span class="course-tag">컴퓨터그래픽스</span>
+              <span class="course-tag">영상정보처리</span>
+              <span class="course-tag">시스템프로그래밍</span>
+            </div>
+          </div>
+        </div>
+        <div class="timeline-item">
+          <div class="timeline-marker"></div>
+          <div class="timeline-content">
+            <div class="timeline-header">
+              <div class="company-info">
+                <h3 class="company-name">조원고등학교</h3>
+                <span class="company-period">2010.03 - 2013.02</span>
+              </div>
+            </div>
+            <p class="company-domain">이공계</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Certifications Section -->
+  <section id="certifications" class="section certifications">
+    <div class="container">
+      <h2 class="section-title">Certifications</h2>
+      <div class="cert-list">
+        <div class="cert-item">
+          <div class="cert-info">
+            <h3>SQL 개발자 (SQLD)</h3>
+            <p>한국데이터산업진흥원</p>
+          </div>
+          <span class="cert-date">2025.06</span>
+        </div>
+        <div class="cert-item">
+          <div class="cert-info">
+            <h3>정보처리기사</h3>
+            <p>한국산업인력공단</p>
+          </div>
+          <span class="cert-date">2018.11</span>
+        </div>
+        <div class="cert-item">
+          <div class="cert-info">
+            <h3>OCJP (Oracle Certified Java Programmer)</h3>
+            <p>Oracle</p>
+          </div>
+          <span class="cert-date">2017.07</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section id="contact" class="section contact">
+    <div class="container">
+      <h2 class="section-title">Contact</h2>
+      <p class="contact-text">새로운 기회나 협업에 대해 이야기하고 싶으시다면 연락 주세요.</p>
+      <div class="contact-links">
+        <a href="mailto:hch0821@naver.com" class="contact-link">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          <span>hch0821@naver.com</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
