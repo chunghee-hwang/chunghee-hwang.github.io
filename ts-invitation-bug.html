@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="초대 내역 삭제되지 않는 버그 분석">
+  <title>초대 내역 삭제 버그 분석 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>초대 내역 삭제되지 않는 버그 분석</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2025.01</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Kotlin / Spring Boot / JPA / Validation</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2025년 1월 2일 (1일)</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>동일한 계정이 <strong>"멤버"</strong>와 <strong>"초대 중인 멤버"</strong>에 동시에 표시됨</li>
+          <li>이미 멤버인 사용자에게 불필요한 초대장이 생성됨</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>정상 흐름 vs 버그 흐름</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>단계</th>
+                <th>정상 흐름</th>
+                <th>버그 흐름</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>관리자가 초대 발송</td>
+                <td>관리자가 초대 발송</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>사용자가 초대 수락 → 멤버 등록</td>
+                <td>사용자가 초대 수락 → 멤버 등록</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>초대장 자동 삭제</td>
+                <td>관리자가 화면 새로고침 없이 "재발송" 클릭</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>-</td>
+                <td><strong>새 초대장 생성 (검증 누락!)</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>버그 발생 시나리오</h4>
+          <div class="ts-code-block">
+            <code>1. 관리자가 A씨에게 초대 발송
+2. A씨가 초대 수락 → 멤버 등록됨, 초대장 삭제됨
+3. 관리자 화면에는 여전히 초대장 표시 (새로고침 안 함)
+4. 관리자가 "재발송" 클릭 → 이미 멤버인데 새 초대장 생성!
+5. 결과: A씨가 멤버 + 초대 중 둘 다 표시 ← 버그</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>근본 원인: Validator 우회</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>호출 경로</th>
+                <th>검증 여부</th>
+                <th>이유</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>API 직접 호출 (POST /invitations)</td>
+                <td>✅ 검증됨</td>
+                <td>Controller에서 @Validated가 검증 실행</td>
+              </tr>
+              <tr>
+                <td>내부 메서드 호출 (renew() → invite())</td>
+                <td>❌ 검증 안됨</td>
+                <td>Service 내부 호출은 Controller 검증 우회</td>
+              </tr>
+              <tr>
+                <td>내부 메서드 호출 (updateUserRole() → invite())</td>
+                <td>❌ 검증 안됨</td>
+                <td>Service 내부 호출은 Controller 검증 우회</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="ts-warning">
+            <p><strong>핵심 문제:</strong> <code>renew()</code>와 <code>updateUserRole()</code> 메서드가 내부적으로 <code>invite()</code>를 호출하면서 <code>@ValidInvitation</code> 검증을 우회함</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-subsection">
+          <h4>수정 전 (버그)</h4>
+          <div class="ts-code-block">
+            <code>관리자가 "재발송" 클릭
+    ↓
+기존 초대장 삭제
+    ↓
+새 초대장 바로 생성 ← 검증 없음!
+    ↓
+(이미 멤버여도 초대장 생성됨)</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>수정 후</h4>
+          <div class="ts-code-block">
+            <code>관리자가 "재발송" 클릭
+    ↓
+기존 초대장 삭제
+    ↓
+★ 이미 멤버인지 확인 ★ ← 검증 추가!
+    ↓
+멤버 아님 → 새 초대장 생성
+멤버임 → 초대장 생성 안함 (에러 메시지)</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>구현</h4>
+          <p><code>invite()</code> 메서드 내부에 직접 검증 로직 추가:</p>
+          <ul>
+            <li><code>ALREADY_BELONG_EMAIL</code>: 이미 소속된 이메일인지 확인</li>
+            <li><code>ALREADY_INVITED_EMAIL</code>: 이미 초대장이 있는 이메일인지 확인</li>
+          </ul>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> 테스트 코드로 버그 재현 후 수정, 더 이상 멤버와 초대장이 중복 생성되지 않습니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>Controller 레벨의 <code>@Validated</code>는 Service 내부 호출에서 우회될 수 있습니다.</li>
+          <li>비즈니스 로직의 핵심 검증은 Service 메서드 내부에도 구현해야 합니다.</li>
+          <li>테스트 코드로 버그를 재현한 후 수정하면 회귀를 방지할 수 있습니다.</li>
+          <li>프론트엔드 상태와 백엔드 상태의 불일치 상황을 고려해야 합니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

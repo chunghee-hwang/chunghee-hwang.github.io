@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="동영상 너비/높이 반대 저장 이슈 해결">
+  <title>동영상 너비/높이 반대 저장 이슈 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>동영상 너비/높이 반대 저장 이슈</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2025.04</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>FFprobe / MediaConvert / Kotlin / Python</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2025년 4월 21일 (1일)</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>720x1280 세로 영상을 업로드하면 DB에 width: 1280, height: 720으로 <strong>반대로 저장</strong>되는 이슈</li>
+          <li>게재위치 제한과 영상 크기가 동일한데 400 에러 발생</li>
+          <li><strong>항상 발생하는 것은 아님</strong> - 특정 조건에서만 발생</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>스마트폰 영상의 메타데이터 특성</h4>
+          <p>스마트폰으로 세로 영상을 찍으면 메타데이터에는:</p>
+          <ul>
+            <li>width: 1280, height: 720 (가로 기준)</li>
+            <li>rotate: 90 (회전 정보)</li>
+          </ul>
+          <p>즉, <strong>width/height는 그대로</strong>이고 <strong>rotate 값만 바뀌는</strong> 경우가 있습니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>FFprobe로 메타데이터 확인</h4>
+          <div class="ts-code-block">
+            <code># 회전 값 확인
+ffprobe -v error -select_streams v:0 \
+  -show_entries stream_tags=rotate \
+  -of default=noprint_wrappers=1:nokey=1 파일명.mp4
+
+# 가로 세로 확인
+ffprobe -v error -select_streams v:0 \
+  -show_entries stream=width,height \
+  -of csv=p=0 파일명.mp4</code>
+          </div>
+        </div>
+
+        <div class="ts-warning">
+          <p><strong>문제:</strong> 기존 코드는 rotate 메타데이터를 고려하지 않고 width/height를 그대로 저장했습니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책 1: 너비/높이 보정</h2>
+
+        <div class="ts-subsection">
+          <h4>회전 각도에 따른 너비/높이 스왑</h4>
+          <div class="ts-code-block">
+            <code>// VideoMetaService.kt
+
+private fun extractVideoWidthHeight(stream: Stream): Pair&lt;Int, Int&gt; {
+    val rotation: Double = getRotation(stream)
+    // 90도 또는 270도 회전이면 가로/세로 바꿔치기
+    val shouldSwapWidthHeight = abs(rotation) == 90.0 || abs(rotation) == 270.0
+    val width = if (shouldSwapWidthHeight) stream.height else stream.width
+    val height = if (shouldSwapWidthHeight) stream.width else stream.height
+    return width to height
+}
+
+private fun getRotation(stream: Stream): Double {
+    val rotation: String? = stream.getTag("rotate")
+    return rotation?.toDoubleOrNull() ?: 0.0
+}</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">추가 문제 발생</h2>
+        <p>너비/높이 보정 후 새로운 문제가 발생했습니다:</p>
+        <ul>
+          <li>MediaConvert로 인코딩 시 rotate 값이 그대로 적용되어 <strong>영상이 눕혀버림</strong></li>
+          <li>예: 720x1280으로 저장했는데, 720x1280 사각형 안에서 90도 회전된 영상이 출력</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책 2: MediaConvert 역회전</h2>
+
+        <div class="ts-subsection">
+          <h4>회전 각도를 DB에 저장하고 역회전 적용</h4>
+          <div class="ts-code-block">
+            <code># mediaconvert-request.py
+
+def specify_rotation(job_settings, args):
+    source_rotation = args.rotation
+    # AUTO로 지정하면 메타데이터의 회전 각도만큼 역회전
+    # 예) 시계방향 90도 회전 → -90도로 역회전
+    is_rotated = source_rotation != 0 and source_rotation % 90 == 0
+    target_rotation = 'AUTO' if is_rotated else 'DEGREE_0'
+
+    for input_item in job_settings.get('Inputs', []):
+        input_item.setdefault('VideoSelector', {})
+        input_item['VideoSelector']['Rotate'] = target_rotation
+
+    return job_settings</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>변경 사항</h4>
+          <ul>
+            <li>DB에 회전 각도 저장 (media_content_resources 테이블)</li>
+            <li>MediaConvert 요청 시 회전 각도가 90, 180, 270도면 <code>AUTO</code>로 설정</li>
+            <li><code>AUTO</code>는 메타데이터 기준으로 역회전 수행</li>
+          </ul>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> 인코딩된 영상이 90도 회전되지 않고 똑바로 출력됩니다. 너비/높이도 정확하게 저장됩니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>스마트폰 영상은 실제 화면 방향과 메타데이터의 width/height가 다를 수 있습니다.</li>
+          <li>영상 처리 시 <strong>rotate 메타데이터</strong>를 반드시 고려해야 합니다.</li>
+          <li>문제 해결 시 연쇄적으로 발생하는 부작용을 예측하고 대응해야 합니다.</li>
+          <li>MediaConvert의 Rotate 옵션을 활용하면 자동으로 역회전 처리가 가능합니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

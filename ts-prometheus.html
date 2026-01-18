@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Prometheus Metric 데이터 유실 트러블슈팅">
+  <title>Prometheus Metric 데이터 유실 이슈 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Detail Hero -->
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>Prometheus Metric 데이터 유실 이슈</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2025.12.26</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Kubernetes / Prometheus / Terraform</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail Content -->
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <!-- 작업 기간 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2025년 12월 26일 (1일)</p>
+      </div>
+
+      <!-- 현상 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>Prometheus의 retention 설정은 15일로 되어있지만, 실제 Grafana에서 지표를 보면 <strong>2일치밖에 없거나 갑자기 사라지는</strong> 현상 발생</li>
+          <li>Pod가 재시작될 때마다 메트릭 데이터가 초기화됨</li>
+        </ul>
+      </div>
+
+      <!-- 원인 분석 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>emptyDir 사용으로 인한 데이터 휘발</h4>
+          <p>Prometheus 서버가 <strong>PersistentVolume(PV) 대신 emptyDir</strong>을 사용하고 있었습니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>emptyDir이란?</h4>
+          <p>Kubernetes에서 제공하는 임시 볼륨 타입 중 하나입니다.</p>
+
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>항목</th>
+                <th>설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>생성 시점</td>
+                <td>Pod가 노드에 할당될 때 생성</td>
+              </tr>
+              <tr>
+                <td>초기 상태</td>
+                <td>이름 그대로 비어있음 (empty)</td>
+              </tr>
+              <tr>
+                <td>저장 위치</td>
+                <td>노드의 로컬 디스크 또는 메모리(tmpfs)</td>
+              </tr>
+              <tr>
+                <td>수명</td>
+                <td>Pod의 생명주기와 동일</td>
+              </tr>
+              <tr>
+                <td>삭제 시점</td>
+                <td>Pod가 노드에서 제거될 때 영구 삭제</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>데이터가 삭제되는 경우</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>상황</th>
+                <th>데이터 유지 여부</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>컨테이너 크래시/재시작</td>
+                <td>유지</td>
+              </tr>
+              <tr>
+                <td>Pod 재시작 (같은 노드)</td>
+                <td>삭제</td>
+              </tr>
+              <tr>
+                <td>Pod 재스케줄링 (다른 노드)</td>
+                <td>삭제</td>
+              </tr>
+              <tr>
+                <td>Deployment 업데이트</td>
+                <td>삭제</td>
+              </tr>
+              <tr>
+                <td>노드 재부팅</td>
+                <td>삭제</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>emptyDir vs PersistentVolume 비교</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>항목</th>
+                <th>emptyDir</th>
+                <th>PersistentVolume</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>데이터 영속성</td>
+                <td>Pod 삭제 시 데이터 삭제</td>
+                <td>Pod 삭제 후에도 데이터 유지</td>
+              </tr>
+              <tr>
+                <td>적합한 용도</td>
+                <td>캐시, 임시 파일</td>
+                <td>데이터베이스, 메트릭 저장</td>
+              </tr>
+              <tr>
+                <td>스토리지 위치</td>
+                <td>노드 로컬 디스크</td>
+                <td>외부 스토리지 (Cinder 등)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>Terraform 설정 확인</h4>
+          <p>CSI Driver 문제로 인해 임시로 emptyDir을 사용하도록 설정되어 있었습니다.</p>
+
+          <div class="ts-code-block">
+            <code># Persistence - CSI Driver 문제로 emptyDir 사용
+"server.persistentVolume.enabled" = false,
+"server.emptyDir.sizeLimit" = local.prometheus_config.persistence_size,</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>실제 K8s 상태 확인</h4>
+          <div class="ts-code-block">
+            <code>kubectl get deployment prometheus-server -n prometheus \
+  -o jsonpath='{.spec.template.spec.volumes}'
+
+# 결과:
+[
+  {
+    "configMap": { "name": "prometheus-server" },
+    "name": "config-volume"
+  },
+  {
+    "emptyDir": { "sizeLimit": "8Gi" },
+    "name": "storage-volume"
+  }
+]</code>
+          </div>
+
+          <div class="ts-warning">
+            <p><strong>문제점:</strong> storage-volume이 emptyDir로 설정되어 있고, prometheus 네임스페이스에 PVC가 없었습니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 해결책 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-subsection">
+          <h4>1. PersistentVolume 사용하도록 Terraform 코드 수정</h4>
+
+          <p><strong>prod 환경:</strong></p>
+          <div class="ts-code-block">
+            <code># Persistence - PV 사용
+"server.persistentVolume.enabled" = true,
+"server.persistentVolume.size" = local.prometheus_config.persistence_size,
+"server.persistentVolume.storageClass" = "csi-cinder-sc-retain-wffc",</code>
+          </div>
+
+          <p><strong>dev 환경:</strong></p>
+          <div class="ts-code-block">
+            <code># Persistence - PV 사용
+"server.persistentVolume.enabled" = true,
+"server.persistentVolume.size" = local.prometheus_config.persistence_size,
+"server.persistentVolume.storageClass" = "csi-cinder-sc-delete",</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>2. StorageClass 선택 기준</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>환경</th>
+                <th>StorageClass</th>
+                <th>ReclaimPolicy</th>
+                <th>설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>prod</td>
+                <td>csi-cinder-sc-retain-wffc</td>
+                <td>Retain</td>
+                <td>PVC 삭제 시에도 데이터 보존</td>
+              </tr>
+              <tr>
+                <td>dev</td>
+                <td>csi-cinder-sc-delete</td>
+                <td>Delete</td>
+                <td>PVC 삭제 시 자동 정리</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>3. 적용 방법</h4>
+          <div class="ts-code-block">
+            <code>cd prod/grafana
+terraform plan
+terraform apply</code>
+          </div>
+          <p>적용 후 Prometheus Pod가 재생성되며 PVC가 새로 생성됩니다. 이후부터는 Pod가 재시작되어도 메트릭 데이터가 유지됩니다.</p>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> PersistentVolume 적용 후 Pod 재시작에도 메트릭 데이터가 정상적으로 유지되어 15일치 데이터를 확인할 수 있게 되었습니다.</p>
+        </div>
+      </div>
+
+      <!-- 참고: StorageClass 비교 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">참고: StorageClass 비교</h2>
+
+        <div class="ts-subsection">
+          <h4>VolumeBindingMode</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>StorageClass</th>
+                <th>VolumeBindingMode</th>
+                <th>설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>csi-cinder-sc-retain</td>
+                <td>Immediate</td>
+                <td>PVC 생성 즉시 PV 생성</td>
+              </tr>
+              <tr>
+                <td>csi-cinder-sc-retain-wffc</td>
+                <td>WaitForFirstConsumer</td>
+                <td>Pod 스케줄링 시점에 PV 생성</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>ReclaimPolicy</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>ReclaimPolicy</th>
+                <th>PVC 삭제 시 동작</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Delete</td>
+                <td>PV와 데이터 자동 삭제</td>
+              </tr>
+              <tr>
+                <td>Retain</td>
+                <td>PV와 데이터 보존 (수동 정리 필요)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-warning">
+          <p><strong>주의사항:</strong> 블록 스토리지는 특정 가용영역(AZ)에 바인딩됩니다. Pod가 다른 AZ의 노드로 이동하면 PV에 접근할 수 없으므로, 같은 AZ 내에서만 노드 간 이동이 가능합니다.</p>
+        </div>
+      </div>
+
+      <!-- 교훈 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>메트릭, 로그 등 영구 보존이 필요한 데이터는 반드시 PersistentVolume을 사용해야 합니다.</li>
+          <li>emptyDir은 캐시, 임시 파일 등 휘발되어도 무방한 데이터에만 사용해야 합니다.</li>
+          <li>"임시" 설정이 운영 환경에 그대로 적용되지 않도록 코드 리뷰 시 주의가 필요합니다.</li>
+          <li>StorageClass 선택 시 환경별 ReclaimPolicy를 다르게 적용하면 운영 효율성을 높일 수 있습니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

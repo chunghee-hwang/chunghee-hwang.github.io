@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MediaConvert 인코딩 시 영상 길이 변경 문제 해결">
+  <title>MediaConvert 영상 길이 변경 문제 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>MediaConvert 인코딩 시 영상 길이 변경 문제</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2025.10</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>AWS MediaConvert / FFprobe / Python</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2025년 10월 (약 1주일 - 리서치 및 구현)</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>AWS MediaConvert로 동영상 인코딩 시 <strong>원본과 결과물의 영상 길이가 달라지는</strong> 문제 발생</li>
+          <li>소수점 차이로 정수 부분이 달라지면 (예: 9.99초 → 10초) 전송 서버에서 영상 길이 정보가 완전히 달라짐</li>
+          <li>DB에 영상 길이를 저장할 때 소수점을 버리고 있어서 문제가 발생</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>현재 인코딩 정책</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>원본 fps</th>
+                <th>처리 방식</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>24fps 미만</td>
+                <td>24fps로 강제 변환</td>
+              </tr>
+              <tr>
+                <td>24~60fps</td>
+                <td>원본 유지</td>
+              </tr>
+              <tr>
+                <td>60fps 초과</td>
+                <td>60fps로 강제 변환</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>문제 케이스: 프레임레이트 증가 (15fps → 24fps)</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>항목</th>
+                <th>원본</th>
+                <th>인코딩 후</th>
+                <th>차이</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>프레임레이트</td>
+                <td>15fps</td>
+                <td>24fps</td>
+                <td>+9fps</td>
+              </tr>
+              <tr>
+                <td>비디오 프레임 수</td>
+                <td>101 프레임</td>
+                <td>162 프레임</td>
+                <td>+61 프레임</td>
+              </tr>
+              <tr>
+                <td>비디오 길이</td>
+                <td>6.733초</td>
+                <td>6.750초</td>
+                <td><strong>+0.017초</strong></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="ts-warning">
+            <p><strong>원인:</strong> MediaConvert의 DUPLICATE_DROP 알고리즘은 정수 프레임만 처리 가능. 161.6 프레임 → 162 프레임으로 반올림되어 길이 증가.</p>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>운영 데이터 분석 결과</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>항목</th>
+                <th>개수</th>
+                <th>비율</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>총 인코딩 기록</td>
+                <td>454</td>
+                <td>100%</td>
+              </tr>
+              <tr>
+                <td>비디오 길이 변경</td>
+                <td>193</td>
+                <td>42.5%</td>
+              </tr>
+              <tr>
+                <td>프레임레이트 변경 → 길이 변경</td>
+                <td>188</td>
+                <td><strong>97.4%</strong></td>
+              </tr>
+            </tbody>
+          </table>
+          <p><strong>핵심:</strong> 비디오 길이 변경 193개 중 188개(97.4%)가 프레임레이트 강제 변환 때문</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-subsection">
+          <h4>채택된 방안: 인코딩된 영상의 길이를 응답</h4>
+          <p>기존에는 원본 영상 길이를 SDK에 응답했지만, <strong>인코딩된 영상의 길이</strong>를 응답하도록 변경했습니다.</p>
+          <ul>
+            <li>고화질/중화질/저화질의 인코딩된 비디오 스트림 길이는 모두 일치</li>
+            <li>100% 문제 해결 가능</li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>도메인 변경사항</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>테이블</th>
+                <th>컬럼</th>
+                <th>설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>media_content_resources</td>
+                <td>duration (BIGINT)</td>
+                <td>원본 비디오 길이 (기존 유지)</td>
+              </tr>
+              <tr>
+                <td>media_contents</td>
+                <td>duration (REAL) - 신규</td>
+                <td>인코딩된 비디오 길이 (소수점 포함)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>마이그레이션</h4>
+          <div class="ts-code-block">
+            <code>-- 컬럼 추가
+ALTER TABLE media_contents ADD duration REAL;
+
+-- 기존 데이터 마이그레이션 (인코딩된 영상 길이로 업데이트)
+UPDATE media_contents
+SET duration = mig.video_stream_length
+FROM mig_duration_to_media_contents mig
+WHERE mig.id = media_contents.id;</code>
+          </div>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> SDK에 인코딩된 영상의 정확한 길이를 응답하여 영상 길이 불일치 문제가 100% 해결되었습니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>미디어 인코딩 시 프레임레이트 변환은 영상 길이에 영향을 줄 수 있습니다.</li>
+          <li>운영 데이터를 분석하여 문제의 규모와 원인을 정확히 파악하는 것이 중요합니다.</li>
+          <li>소수점 처리 방식(반올림, 버림)이 시스템 전체에 미치는 영향을 고려해야 합니다.</li>
+          <li>원본 데이터와 가공 데이터를 분리하여 저장하면 유연성이 높아집니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

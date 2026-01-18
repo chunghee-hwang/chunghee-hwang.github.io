@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Airflow Scheduler Redis 모듈 에러 트러블슈팅">
+  <title>Airflow Scheduler Redis 모듈 에러 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>Airflow Scheduler Redis 모듈 에러</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2024.10</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Airflow / Celery / Redis / Kubernetes</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2024년 10월 (발생: 2024-07-20, 2024-09-25, 2024-09-26, 2024-11-14)</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>대부분의 DAG들이 정상 가동되지 못하는 현상 발생</li>
+          <li>불규칙적으로 발생하며, 특정 조건에서만 나타남:
+            <ul>
+              <li>Airflow 레포에 코드 변경으로 git-sync가 이뤄졌을 때</li>
+              <li>Terraform으로 Airflow 환경 변수 수정 후 apply하여 파드가 재시작되었을 때</li>
+            </ul>
+          </li>
+        </ul>
+
+        <div class="ts-code-block">
+          <code>ERROR - Error sending Celery task: module 'redis' has no attribute 'client'
+Celery Task ID: TaskInstanceKey(dag_id='nestads-invitation-expired', ...)
+...
+File "kombu/transport/redis.py", line 282, in &lt;module&gt;
+  class PrefixedRedisPipeline(GlobalKeyPrefixMixin, redis.client.Pipeline):
+AttributeError: module 'redis' has no attribute 'client'</code>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>에러 로그 분석</h4>
+          <p>에러는 Celery가 Redis 브로커에 연결하려 할 때 발생했습니다. <code>kombu/transport/redis.py</code>에서 <code>redis.client.Pipeline</code>을 참조하는데, redis 모듈에서 client 속성을 찾지 못하는 문제였습니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>문제 코드 위치</h4>
+          <div class="ts-code-block">
+            <code># /home/airflow/.local/lib/python3.9/site-packages/kombu/transport/redis.py
+
+class PrefixedRedisPipeline(GlobalKeyPrefixMixin, redis.client.Pipeline):
+    """Custom Redis pipeline that takes global_keyprefix into consideration."""
+    def __init__(self, *args, **kwargs):
+        self.global_keyprefix = kwargs.pop('global_keyprefix', '')
+        redis.client.Pipeline.__init__(self, *args, **kwargs)</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>근본 원인</h4>
+          <p>Airflow 2.8.4 버전에서 발생하는 알려진 이슈로, 2.9.4 버전에서도 동일하게 발생합니다. Python의 redis 모듈과 kombu 라이브러리 간의 호환성 문제로 추정됩니다.</p>
+          <div class="ts-warning">
+            <p><strong>참고:</strong> Apache Airflow GitHub Issue #41359에서 동일한 문제가 보고되어 있으며, 아직 해결 중인 상태입니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">재현 시도</h2>
+        <p>로컬 환경에서 Docker Compose로 동일한 Airflow, Redis 버전을 구성하여 재현을 시도했습니다:</p>
+        <ul>
+          <li>Redis 컨테이너를 임시로 중지해본 결과, 비슷하지만 다른 에러가 발생</li>
+          <li>정확한 재현 조건을 찾지 못함 - 불규칙적 발생이 특징</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-subsection">
+          <h4>자동 복구 스크립트 배포</h4>
+          <p>해당 에러 발생 시 스케줄러를 자동으로 재시작하는 스크립트를 Kubernetes에 배포했습니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>임시 해결 방법</h4>
+          <p>에러 발생 시 수동으로 airflow-scheduler StatefulSet을 통해 redeploy:</p>
+          <div class="ts-code-block">
+            <code>kubectl rollout restart statefulset airflow-scheduler -n airflow</code>
+          </div>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> 자동 복구 스크립트 배포 후 에러 발생 시에도 빠르게 정상화되어 DAG 실행 중단 시간이 크게 감소했습니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>오픈소스 라이브러리 간 버전 호환성 문제는 예측하기 어려우므로, 모니터링과 자동 복구 체계가 중요합니다.</li>
+          <li>불규칙적으로 발생하는 이슈는 완벽한 해결보다 빠른 복구에 초점을 맞추는 것이 현실적입니다.</li>
+          <li>Kubernetes 환경에서는 Pod 재시작을 자동화하여 장애 대응 시간을 단축할 수 있습니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

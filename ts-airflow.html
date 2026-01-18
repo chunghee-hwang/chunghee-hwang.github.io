@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Airflow DAG 스케줄 시간 Drift 트러블슈팅">
+  <title>Airflow DAG 스케줄 시간 Drift 문제 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Detail Hero -->
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>Airflow DAG 스케줄 시간 Drift 문제</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2025.12</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Airflow / PostgreSQL / NTP</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail Content -->
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <!-- 작업 기간 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2025년 12월 (약 2일 - 원인 분석 및 인프라팀 협업)</p>
+      </div>
+
+      <!-- 현상 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>Airflow DAG가 예정된 시간에 정확히 실행되지 않고, <strong>실행 시간이 점점 밀리는</strong> 현상 발생</li>
+          <li>예를 들어 매 정시에 실행되어야 하는 DAG가 00:00:18, 01:00:36, 02:00:54... 식으로 점점 늦어짐</li>
+          <li>시간이 지날수록 drift가 누적되어 스케줄 예측이 어려워짐</li>
+        </ul>
+      </div>
+
+      <!-- 원인 분석 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>1. Airflow 스케줄러의 시간 기준</h4>
+          <p>Airflow 스케줄러는 메타데이터 DB(PostgreSQL)의 시간을 기준으로 DAG 실행 시점을 결정합니다. 스케줄러가 다음 실행 시점을 계산할 때 DB 서버의 <code>now()</code> 함수 결과를 참조합니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>2. 시간 차이 확인</h4>
+          <p>PostgreSQL 서버와 NTP 서버의 시간을 비교한 결과, <strong>PostgreSQL이 NTP 서버보다 약 18초 빠른</strong> 것으로 확인되었습니다.</p>
+
+          <div class="ts-code-block">
+            <code># PostgreSQL 서버 시간 확인
+SELECT now();
+-- 결과: 2025-12-XX 00:00:18.XXX
+
+# NTP 서버 시간 (실제 표준 시간)
+-- 결과: 2025-12-XX 00:00:00.XXX
+
+# 차이: 약 18초</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>3. Drift 발생 메커니즘</h4>
+          <p>문제가 발생하는 과정은 다음과 같습니다:</p>
+
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>단계</th>
+                <th>설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>스케줄러가 "다음 실행 시간"을 계산 (DB 시간 기준)</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>DB 시간이 18초 빠르므로, 실제보다 18초 늦게 실행됨</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>다음 스케줄 계산 시 또 18초가 추가됨</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>시간이 지날수록 drift가 누적</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="ts-warning">
+            <p><strong>근본 원인:</strong> 클라우드 PostgreSQL 인스턴스가 NTP 서버와 동기화되지 않아 시스템 시간이 점점 틀어진 상태였습니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 해결책 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-subsection">
+          <h4>1. 인프라팀에 NTP 동기화 요청</h4>
+          <p>클라우드 PostgreSQL은 관리형 서비스로 직접 시스템 설정을 변경할 수 없어, 인프라팀(클라우드 제공업체)에 NTP 동기화 설정을 요청했습니다.</p>
+
+          <div class="ts-highlight">
+            <p><strong>요청 내용:</strong> PostgreSQL 인스턴스의 시스템 시간을 NTP 서버와 동기화해주세요. 현재 약 18초의 시간 차이가 발생하여 Airflow 스케줄링에 문제가 있습니다.</p>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>2. 동기화 후 확인</h4>
+          <p>인프라팀에서 NTP 동기화 설정 완료 후, 시간 차이가 해소되었는지 확인했습니다.</p>
+
+          <div class="ts-code-block">
+            <code># 동기화 후 PostgreSQL 서버 시간 확인
+SELECT now();
+-- 결과: 2025-12-XX 00:00:00.XXX (NTP와 일치)</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>3. Airflow 스케줄 정상화 확인</h4>
+          <p>NTP 동기화 후 DAG들이 예정된 시간에 정확히 실행되는 것을 확인했습니다.</p>
+
+          <div class="ts-code-block">
+            <code># Airflow UI에서 DAG 실행 이력 확인
+DAG: daily_report
+Scheduled: 2025-12-XX 00:00:00
+Started:   2025-12-XX 00:00:01  # 정상 (1초 이내 시작)</code>
+          </div>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> NTP 동기화 적용 후 DAG 스케줄이 정상화되어 예정된 시간에 정확히 실행되기 시작했습니다. Drift 현상이 완전히 해소되었습니다.</p>
+        </div>
+      </div>
+
+      <!-- 추가 고려사항 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">추가 고려사항</h2>
+
+        <div class="ts-subsection">
+          <h4>분산 시스템에서의 시간 동기화</h4>
+          <p>분산 시스템에서는 여러 컴포넌트 간 시간 동기화가 매우 중요합니다:</p>
+          <ul>
+            <li><strong>스케줄러 + DB:</strong> 이번 사례처럼 스케줄 drift 발생 가능</li>
+            <li><strong>로그 시스템:</strong> 시간이 맞지 않으면 로그 순서가 뒤섞여 디버깅이 어려워짐</li>
+            <li><strong>분산 트랜잭션:</strong> 시간 기반 충돌 해결 시 데이터 정합성 문제 발생 가능</li>
+            <li><strong>인증 토큰:</strong> 토큰 만료 시간 계산 오류로 인증 실패 가능</li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>예방을 위한 모니터링</h4>
+          <p>시간 동기화 문제를 조기에 발견하기 위한 모니터링 방안:</p>
+          <ul>
+            <li>주요 서버들의 시간 차이를 주기적으로 체크하는 스크립트 작성</li>
+            <li>NTP 동기화 상태를 모니터링하고 drift 발생 시 알림</li>
+            <li>Airflow DAG 실행 시간과 예정 시간의 차이를 메트릭으로 수집</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- 교훈 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>분산 시스템에서 <strong>시간 동기화</strong>는 기본 중의 기본이지만, 관리형 서비스에서는 간과하기 쉽습니다.</li>
+          <li>스케줄 기반 작업에서 "점점 밀리는" 현상이 발생하면 <strong>DB 서버 시간</strong>을 의심해봐야 합니다.</li>
+          <li>관리형 서비스라도 NTP 동기화 설정이 기본으로 되어있지 않을 수 있으므로 확인이 필요합니다.</li>
+          <li>인프라팀과의 <strong>빠른 커뮤니케이션</strong>이 문제 해결 시간을 크게 단축시킵니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

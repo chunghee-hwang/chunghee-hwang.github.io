@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ElasticSearch ILM 정책 및 APM 데이터스트림 트러블슈팅">
+  <title>ElasticSearch 트러블슈팅 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Detail Hero -->
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>ElasticSearch 트러블슈팅</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2025.12.22</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Kubernetes / ElasticSearch</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detail Content -->
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <!-- 작업 기간 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2025년 12월 22일 (1일)</p>
+      </div>
+
+      <!-- 현상 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <p>ElasticSearch 클러스터에서 두 가지 문제가 동시에 발생했습니다:</p>
+        <ul>
+          <li><strong>ILM 정책 불일치:</strong> 인덱스에 적용된 ILM 정책이 실제 존재하지 않는 정책을 참조하고 있었음</li>
+          <li><strong>APM 데이터스트림 미생성:</strong> APM 서버가 데이터를 수집하고 있지만 데이터스트림이 생성되지 않아 데이터가 저장되지 않음</li>
+        </ul>
+      </div>
+
+      <!-- 원인 분석 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>1. ILM 정책 불일치 문제</h4>
+          <p>조사 결과, 기존에 사용하던 ILM 정책이 삭제되었지만 해당 정책을 참조하는 인덱스들은 그대로 남아있었습니다. ElasticSearch는 인덱스가 존재하지 않는 정책을 참조할 경우 ILM 작업(롤오버, 삭제 등)을 수행하지 못합니다.</p>
+
+          <div class="ts-code-block">
+            <code>GET _ilm/policy/missing-policy-name
+// 결과: 404 Not Found - 정책이 존재하지 않음
+
+GET index-name/_ilm/explain
+// 결과: policy "missing-policy-name" does not exist</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>2. APM 데이터스트림 미생성 문제</h4>
+          <p>APM 관련 인덱스 템플릿이 존재하지 않거나 우선순위가 낮아 다른 템플릿에 의해 덮어씌워지고 있었습니다. 데이터스트림은 인덱스 템플릿이 반드시 존재해야 생성됩니다.</p>
+
+          <div class="ts-code-block">
+            <code>GET _index_template/apm-*
+// 결과: APM 관련 템플릿 누락 확인
+
+GET _data_stream/traces-apm*
+// 결과: 데이터스트림 없음</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- 해결책 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-subsection">
+          <h4>1. ILM 정책 재생성</h4>
+          <p>누락된 ILM 정책을 새로 생성하여 기존 인덱스들이 정상적으로 수명주기 관리를 받을 수 있도록 했습니다.</p>
+
+          <div class="ts-code-block">
+            <code>PUT _ilm/policy/logs-policy
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "min_age": "0ms",
+        "actions": {
+          "rollover": {
+            "max_size": "50gb",
+            "max_age": "1d"
+          }
+        }
+      },
+      "delete": {
+        "min_age": "7d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>2. APM 인덱스 템플릿 설정</h4>
+          <p>APM 데이터용 인덱스 템플릿을 생성하고, 우선순위를 높게 설정하여 다른 템플릿과 충돌하지 않도록 했습니다.</p>
+
+          <div class="ts-code-block">
+            <code>PUT _index_template/apm-traces
+{
+  "index_patterns": ["traces-apm*"],
+  "data_stream": {},
+  "priority": 500,
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "apm-policy"
+    }
+  }
+}</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>3. 데이터스트림 생성 확인</h4>
+          <p>템플릿 적용 후 APM 서버가 데이터를 전송하면 자동으로 데이터스트림이 생성됩니다.</p>
+
+          <div class="ts-code-block">
+            <code>GET _data_stream/traces-apm*
+// 결과: 데이터스트림 정상 생성 확인</code>
+          </div>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> ILM 정책이 정상적으로 적용되어 인덱스 수명주기 관리가 재개되었고, APM 데이터가 정상적으로 수집되기 시작했습니다.</p>
+        </div>
+      </div>
+
+      <!-- 교훈 -->
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>ILM 정책을 삭제하기 전에 해당 정책을 참조하는 인덱스가 있는지 반드시 확인해야 합니다.</li>
+          <li>인덱스 템플릿의 우선순위(priority)를 적절히 설정하여 충돌을 방지해야 합니다.</li>
+          <li>ElasticSearch 클러스터 상태를 모니터링하는 알림 시스템을 구축하면 조기에 문제를 발견할 수 있습니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

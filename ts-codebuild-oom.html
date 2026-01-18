@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CodeBuild 타임아웃/OOM 해결">
+  <title>CodeBuild 타임아웃/OOM 해결 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>CodeBuild 타임아웃/OOM 해결</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2025.10</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>AWS CodeBuild / Gradle / Kotlin / Swap Memory</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2025년 10월 6일 ~ 20일 (약 2주)</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>백엔드 레포의 테스트 코드 양이 증가하면서 CodeBuild에서 <strong>OOM(Out of Memory)</strong> 또는 <strong>30분 Timeout</strong> 발생</li>
+          <li>CodeBuild 스펙: 2 vCPUs, 3.6GB Memory</li>
+          <li>메모리 사용량 지표에서 3GB를 100% 사용 중</li>
+        </ul>
+
+        <div class="ts-code-block">
+          <code>> Task :test FAILED
+FAILURE: Build failed with an exception.
+* What went wrong:
+Execution failed for task ':test'.
+> Process 'Gradle Test Executor 2' finished with non-zero exit value 137
+
+# Exit code 137 = OOM Killed</code>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">시도한 해결책들</h2>
+
+        <div class="ts-subsection">
+          <h4>시도 1: @SpringBootTest → Mockk 변환 (실패)</h4>
+          <ul>
+            <li>53개의 @SpringBootTest 중 21개를 일반 Mockk으로 변환</li>
+            <li>로컬 테스트 결과: 75초 → 71초 (4초 개선)</li>
+            <li><strong>결과:</strong> 메모리 사용량 차이 없음, 여전히 137 Error 발생</li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>시도 2: CodeBuild 로컬 캐시 (실패)</h4>
+          <ul>
+            <li>캐시 적용 시 4분만에 빌드 완료</li>
+            <li><strong>문제점:</strong> 캐시 적용이 불규칙적, 실패해야 할 테스트가 성공할 수 있음</li>
+            <li>S3 캐시는 과금 문제로 사용 불가</li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>시도 3: Swap Memory 설정 (성공)</h4>
+          <p>물리적 메모리가 부족하면 가상 메모리(Swap)를 사용하도록 설정했습니다.</p>
+          <div class="ts-code-block">
+            <code># buildspec.yml
+- echo "--- Configuring Swap (Virtual Memory) ---"
+- fallocate -l 8G /swapfile
+- chmod 600 /swapfile
+- mkswap /swapfile
+- swapon /swapfile
+- echo "--- Current Memory and Swap Status ---"
+- free -h
+- swapon -s</code>
+          </div>
+
+          <div class="ts-code-block">
+            <code># 결과
+              total    used    free   shared  buff/cache  available
+Mem:         3.6Gi   416Mi   1.5Gi    0.0Ki      1.8Gi      3.0Gi
+Swap:        8.0Gi      0B   8.0Gi   ← 8G Swap 추가됨</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-highlight">
+          <p><strong>최종 해결:</strong> 8GB Swap 메모리 설정으로 OOM과 30분 타임아웃 문제 해결. Storage 사용은 CodeBuild 과금 기준에 포함되지 않아 비용 문제 없음.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>추가 개선사항</h4>
+          <ul>
+            <li>테스트 프로필 수정: local → test (H2 memory DB 사용)</li>
+            <li>Gradle 병렬 실행 옵션 추가: <code>-Dorg.gradle.parallel=true</code></li>
+            <li>테스트 진척도 로그 추가: 50개 단위로 진행 상황 출력</li>
+          </ul>
+          <div class="ts-code-block">
+            <code>테스트 진척도: 50개 완료
+테스트 진척도: 100개 완료
+...
+테스트 진척도: 750개 완료
+테스트 진척도: 759개 완료</code>
+          </div>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> is_deployable: false 기준 15분 빌드 시간 소요. 테스트 속도는 기존과 동일하지만 빌드 안정성이 크게 향상되었습니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>테스트 코드 최적화보다 인프라 설정(Swap)이 더 효과적인 경우가 있습니다.</li>
+          <li>CodeBuild의 Storage 사용은 과금되지 않으므로 Swap을 활용할 수 있습니다.</li>
+          <li>빌드 진행 상황을 로그로 출력하면 디버깅과 모니터링에 도움이 됩니다.</li>
+          <li>Exit code 137은 Linux에서 OOM Killer에 의해 프로세스가 종료되었음을 의미합니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

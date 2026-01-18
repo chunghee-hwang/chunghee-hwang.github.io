@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Amazon SES 스팸 방지 트러블슈팅">
+  <title>Amazon SES 스팸 방지 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>Amazon SES 스팸 방지</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2024.10</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>AWS SES / Route 53 / SPF / DKIM / DMARC</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2024년 10월 30일 (1일)</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>서비스에서 발송하는 인증 메일이 간혹 <strong>스팸 메일함</strong>으로 분류되는 문제 발생</li>
+          <li>사용자들이 인증 메일을 받지 못했다고 문의</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>이메일 인증 프로토콜 검사</h4>
+          <p>이메일 인증 검사 도구(learndmarc.com)로 확인한 결과, SPF, DKIM, DMARC 설정이 불완전했습니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>이메일 인증 프로토콜이란?</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>프로토콜</th>
+                <th>설명</th>
+                <th>역할</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>SPF</td>
+                <td>Sender Policy Framework</td>
+                <td>허용된 메일 서버 목록 정의</td>
+              </tr>
+              <tr>
+                <td>DKIM</td>
+                <td>DomainKeys Identified Mail</td>
+                <td>이메일에 디지털 서명 추가</td>
+              </tr>
+              <tr>
+                <td>DMARC</td>
+                <td>Domain-based Message Authentication</td>
+                <td>SPF/DKIM 실패 시 정책 정의</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="ts-warning">
+          <p><strong>문제점:</strong> SPF, DMARC, Mail From Domain 설정이 누락되어 수신 메일 서버에서 스팸으로 분류할 가능성이 높았습니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-subsection">
+          <h4>Terraform으로 이메일 인증 설정 추가</h4>
+          <p>Route 53에 SPF, DMARC 레코드를 추가하고, SES에 Mail From Domain을 설정했습니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>1. SPF 레코드 설정</h4>
+          <div class="ts-code-block">
+            <code># Route 53 TXT 레코드
+"v=spf1 include:amazonses.com ~all"</code>
+          </div>
+          <p>Amazon SES에서 발송하는 메일을 허용하는 SPF 레코드입니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>2. DMARC 레코드 설정</h4>
+          <div class="ts-code-block">
+            <code># Route 53 TXT 레코드 (_dmarc.도메인)
+"v=DMARC1; p=none; rua=mailto:report@example.com"</code>
+          </div>
+          <p>DMARC 정책과 리포트 수신 이메일을 설정합니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>3. Mail From Domain 설정</h4>
+          <p>SES에서 커스텀 Mail From 도메인을 설정하여 발신자 도메인의 신뢰도를 높였습니다.</p>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> SPF, DKIM, DMARC 검사 도구에서 모두 PASS로 확인되었고, 스팸 분류 문제가 해결되었습니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>이메일 발송 시 SPF, DKIM, DMARC 설정은 필수입니다.</li>
+          <li>이메일 인증 설정은 Terraform으로 코드화하여 관리하면 일관성을 유지할 수 있습니다.</li>
+          <li>정기적으로 이메일 인증 상태를 검사하는 것이 좋습니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

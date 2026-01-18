@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SPF, DKIM 실패 원인 파악 및 개선">
+  <title>SPF, DKIM 실패 원인 파악 및 개선 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>SPF, DKIM 실패 원인 파악 및 개선</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2024.12</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>DMARC / SPF / Route 53 / Google Workspace</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2024년 12월 30일 (1일)</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <p>DMARC 리포트 메일에서 SPF, DKIM이 실패하고 있다는 알림을 받았습니다:</p>
+        <div class="ts-code-block">
+          <code>&lt;policy_evaluated&gt;
+  &lt;dkim&gt;fail&lt;/dkim&gt;
+  &lt;spf&gt;fail&lt;/spf&gt;
+&lt;/policy_evaluated&gt;
+
+&lt;source_ip&gt;209.85.220.69&lt;/source_ip&gt;  &lt;!-- Google IP --&gt;</code>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>1. Source IP 분석</h4>
+          <p>SPF, DKIM 실패한 source IP가 모두 <code>209.85.220.69</code>였습니다. WHOIS 조회 결과 <strong>Google (Mountain View)</strong>의 IP였습니다.</p>
+          <div class="ts-warning">
+            <p><strong>의문점:</strong> Amazon SES를 통해 메일을 보냈는데 왜 Google에서 에러가 발생하는가?</p>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>2. 원인 발견</h4>
+          <p>조사 결과, <strong>구글 그룹 메일로 포워딩</strong>될 때 SPF/DKIM 평가가 실패할 수 있다는 것을 발견했습니다. 메일이 Google 서버를 경유하면서 원본 인증 정보가 변경되기 때문입니다.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>3. Route 53 레코드 확인</h4>
+          <table class="ts-table">
+            <thead>
+              <tr>
+                <th>문제점</th>
+                <th>현재 설정</th>
+                <th>필요한 설정</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>SPF에 Google 누락</td>
+                <td>v=spf1 include:amazonses.com -all</td>
+                <td>v=spf1 include:_spf.google.com include:amazonses.com ~all</td>
+              </tr>
+              <tr>
+                <td>SPF 정책이 너무 엄격</td>
+                <td>-all (hard fail)</td>
+                <td>~all (soft fail)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-subsection">
+          <h4>Terraform으로 SPF 레코드 수정</h4>
+          <div class="ts-code-block">
+            <code># route53/main.tf
+
+resource "aws_route53_record" "spf_record" {
+  zone_id = aws_route53_zone.example_com.id
+  name    = aws_route53_zone.example_com.name
+  type    = "TXT"
+  ttl     = 300
+  records = ["v=spf1 include:_spf.google.com include:amazonses.com ~all"]
+}</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>변경 내용</h4>
+          <ul>
+            <li><code>include:_spf.google.com</code> 추가 - Google 서버 경유 시에도 SPF 통과</li>
+            <li><code>-all</code> → <code>~all</code> 변경 - 엄격한 제한에서 완화된 제한으로</li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>DMARC 정책 확인</h4>
+          <div class="ts-code-block">
+            <code>"v=DMARC1; p=none; rua=mailto:report@example.com"</code>
+          </div>
+          <p><code>p=none</code>으로 설정되어 있어 SPF/DKIM 실패해도 메일이 차단되지는 않았습니다. 리포트만 수신하고 있었습니다.</p>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>결과:</strong> SPF 레코드 수정 후 Google 그룹 메일 포워딩 시에도 SPF 인증이 통과하게 되었습니다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>DMARC 리포트를 정기적으로 모니터링하면 이메일 인증 문제를 조기에 발견할 수 있습니다.</li>
+          <li>이메일이 여러 서버를 경유할 수 있으므로, SPF에 관련된 모든 도메인을 포함해야 합니다.</li>
+          <li><code>-all</code>(hard fail)보다 <code>~all</code>(soft fail)이 메일 전달성에 유리합니다.</li>
+          <li>그룹 메일, 포워딩 등 이메일 경로가 복잡한 경우를 고려해야 합니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

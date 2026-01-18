@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="황충희 - 인프라 트러블슈팅 기록">
+  <title>트러블슈팅 기록 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="ts-hero">
+    <div class="container">
+      <h1>Infrastructure Troubleshooting</h1>
+      <p>실무에서 경험한 인프라 이슈 해결 기록입니다.</p>
+    </div>
+  </section>
+
+  <!-- Troubleshooting List -->
+  <section class="section ts-list-section">
+    <div class="container">
+      <div class="ts-cards">
+        <a href="ts-elasticsearch.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2025.12.22</span>
+            <span class="ts-tag">Kubernetes</span>
+          </div>
+          <h3>ElasticSearch 트러블슈팅</h3>
+          <p>ILM 정책 불일치 및 APM 데이터스트림 미생성 문제 해결. 기존 운영 중인 ElasticSearch 클러스터에서 발생한 인덱스 관리 이슈를 분석하고 해결한 사례입니다.</p>
+          <div class="ts-tech">
+            <span>ElasticSearch</span>
+            <span>Kubernetes</span>
+            <span>Kibana</span>
+            <span>ILM</span>
+          </div>
+        </a>
+
+        <a href="ts-prometheus.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2025.12.26</span>
+            <span class="ts-tag">Monitoring</span>
+          </div>
+          <h3>Prometheus Metric 데이터 유실 이슈</h3>
+          <p>Retention 설정은 15일인데 실제로는 2일치 메트릭만 보이거나 갑자기 사라지는 문제. emptyDir 사용으로 인한 데이터 휘발 문제를 PersistentVolume으로 해결.</p>
+          <div class="ts-tech">
+            <span>Prometheus</span>
+            <span>Kubernetes</span>
+            <span>Terraform</span>
+            <span>PersistentVolume</span>
+          </div>
+        </a>
+
+        <a href="ts-airflow.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2025.12</span>
+            <span class="ts-tag">Data Pipeline</span>
+          </div>
+          <h3>Airflow DAG 스케줄 시간 Drift 문제</h3>
+          <p>DAG 실행 시간이 점점 밀리는 현상 발생. 클라우드 PostgreSQL의 시스템 시간이 NTP 서버보다 18초 빠른 것이 원인으로, 인프라팀을 통해 NTP 동기화로 해결.</p>
+          <div class="ts-tech">
+            <span>Airflow</span>
+            <span>PostgreSQL</span>
+            <span>NTP</span>
+          </div>
+        </a>
+
+        <a href="ts-codebuild-oom.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2025.10</span>
+            <span class="ts-tag">CI/CD</span>
+          </div>
+          <h3>CodeBuild 타임아웃/OOM 해결</h3>
+          <p>테스트 코드 양이 증가하면서 CodeBuild에서 OOM 또는 30분 Timeout 발생. Exit code 137 = OOM Killed. 8GB Swap 메모리 설정으로 해결.</p>
+          <div class="ts-tech">
+            <span>AWS CodeBuild</span>
+            <span>Gradle</span>
+            <span>Kotlin</span>
+            <span>Swap Memory</span>
+          </div>
+        </a>
+
+        <a href="ts-mediaconvert.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2025.10</span>
+            <span class="ts-tag">Media</span>
+          </div>
+          <h3>MediaConvert 인코딩 시 영상 길이 변경 문제</h3>
+          <p>AWS MediaConvert로 인코딩 시 원본과 결과물의 영상 길이가 달라지는 문제. 프레임레이트 강제 변환이 원인으로, 인코딩된 영상 길이를 응답하도록 수정.</p>
+          <div class="ts-tech">
+            <span>AWS MediaConvert</span>
+            <span>FFprobe</span>
+            <span>Python</span>
+          </div>
+        </a>
+
+        <a href="ts-video-rotation.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2025.04</span>
+            <span class="ts-tag">Media</span>
+          </div>
+          <h3>동영상 너비/높이 반대 저장 이슈</h3>
+          <p>720x1280 세로 영상이 DB에 반대로 저장되는 문제. 스마트폰 영상의 rotate 메타데이터를 고려하지 않아 발생. 회전 각도에 따른 너비/높이 스왑 및 MediaConvert 역회전 적용.</p>
+          <div class="ts-tech">
+            <span>FFprobe</span>
+            <span>MediaConvert</span>
+            <span>Kotlin</span>
+            <span>Python</span>
+          </div>
+        </a>
+
+        <a href="ts-invitation-bug.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2025.01</span>
+            <span class="ts-tag">Backend</span>
+          </div>
+          <h3>초대 내역 삭제되지 않는 버그 분석</h3>
+          <p>동일한 계정이 "멤버"와 "초대 중인 멤버"에 동시에 표시되는 버그. Service 내부 호출이 Controller의 @Validated 검증을 우회하여 발생. 메서드 내부 검증 로직 추가로 해결.</p>
+          <div class="ts-tech">
+            <span>Kotlin</span>
+            <span>Spring Boot</span>
+            <span>JPA</span>
+            <span>Validation</span>
+          </div>
+        </a>
+
+        <a href="ts-spf-dkim.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2024.12</span>
+            <span class="ts-tag">Email</span>
+          </div>
+          <h3>SPF, DKIM 실패 원인 파악 및 개선</h3>
+          <p>DMARC 리포트에서 SPF/DKIM 실패 알림 수신. Google 그룹 메일 포워딩 시 인증 실패. SPF에 Google 도메인 추가 및 정책 완화(-all → ~all)로 해결.</p>
+          <div class="ts-tech">
+            <span>DMARC</span>
+            <span>SPF</span>
+            <span>Route 53</span>
+            <span>Google Workspace</span>
+          </div>
+        </a>
+
+        <a href="ts-ses-spam.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2024.11</span>
+            <span class="ts-tag">Email</span>
+          </div>
+          <h3>Amazon SES 이메일 스팸 방지</h3>
+          <p>고객에게 발송되는 이메일이 스팸함에 들어가는 문제. SPF 레코드 설정, DMARC 정책 추가, Mail From Domain 설정으로 이메일 신뢰도 개선.</p>
+          <div class="ts-tech">
+            <span>Amazon SES</span>
+            <span>DMARC</span>
+            <span>SPF</span>
+            <span>Route 53</span>
+          </div>
+        </a>
+
+        <a href="ts-airflow-redis.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2024.10</span>
+            <span class="ts-tag">Data Pipeline</span>
+          </div>
+          <h3>Airflow Scheduler Redis 모듈 에러</h3>
+          <p>Airflow Scheduler에서 redis.client 모듈 에러가 불규칙적으로 발생. K8s에 로그 모니터링 쉘스크립트를 배포하여 에러 감지 시 스케줄러 파드 자동 재시작으로 해결.</p>
+          <div class="ts-tech">
+            <span>Airflow</span>
+            <span>Celery</span>
+            <span>Redis</span>
+            <span>Kubernetes</span>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
