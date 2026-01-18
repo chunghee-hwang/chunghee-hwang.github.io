@@ -82,6 +82,12 @@ ul {
   border-radius: 2px;
 }
 
+.section-description {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  margin-bottom: 32px;
+}
+
 /* ===== Navigation ===== */
 .nav {
   position: fixed;
