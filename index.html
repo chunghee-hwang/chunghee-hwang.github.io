@@ -126,6 +126,32 @@
             <div class="projects-list">
               <div class="project-item">
                 <div class="project-header" onclick="toggleProject(this)">
+                  <h4>Hibernate 6 마이그레이션 성능 최적화</h4>
+                  <span class="project-period">2026.05</span>
+                </div>
+                <div class="project-details">
+                  <p>Spring Boot 3.2.2 마이그레이션 후 광고 송출 동기화 API의 응답 시간이 prod 기준 1,500ms에서 4,000ms로 약 2.6배 저하된 문제를 해결. 원인은 Hibernate 6 SQM 엔진이 컬렉션 fetchJoin의 Cartesian Product를 처리하는 비용이 급증한 것으로, 33개 테이블 한방 쿼리를 ID 조회 → 엔티티 로딩 2단계로 분할하고 컬렉션은 Hibernate.initialize() + batch fetch로 지연 초기화하여 prod 응답 시간 ~500ms 달성(SB2 대비 약 3배 빠름). 배포 후 RDS CPU 사용량 45% → 20%로 감소.</p>
+                  <div class="project-tech">
+                    <span>Hibernate 6</span><span>QueryDSL</span><span>Spring Boot</span><span>Kotlin</span><span>PostgreSQL</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>Spring Boot 3.2.2 / Java 21 전사 마이그레이션</h4>
+                  <span class="project-period">2026.03 - 2026.04</span>
+                </div>
+                <div class="project-details">
+                  <p>Spring Boot 2.7 EOL 대응을 위해 백엔드 10개 모듈(8개 레포 + 공용 서브모듈 2개)을 Spring Boot 3.2.2 / Java 21 / Hibernate 6로 일괄 전환. OpenRewrite로 javax → jakarta 자동 변환(267+ 파일), Spring Security 6 / Hibernate 6 dialect / @TypeDef → hypersistence-utils / JPQL is false → = false 등 호환성 이슈를 수동 보완하고, Jackson 2.15 Boolean 직렬화 변화로 깨진 API 응답은 커스텀 AnnotationIntrospector로 SB2 호환성을 유지. 변경 파일 500+, 단위 테스트 2,300+ 전체 통과 후 Kafka 기반 광고 로그 파이프라인 5단계 통합 검증 완료.</p>
+                  <div class="project-tech">
+                    <span>Spring Boot 3.2.2</span><span>Java 21</span><span>Kotlin 1.9</span><span>Hibernate 6</span><span>Gradle 8.5</span><span>OpenRewrite</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
                   <h4>예상 노출수 시스템</h4>
                   <span class="project-period">2025.11 - 2025.12</span>
                 </div>
