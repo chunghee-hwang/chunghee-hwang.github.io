@@ -38,6 +38,21 @@
   <section class="section ts-list-section">
     <div class="container">
       <div class="ts-cards">
+        <a href="ts-hibernate6-performance.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.05</span>
+            <span class="ts-tag">Performance</span>
+          </div>
+          <h3>Hibernate 6 마이그레이션 후 API 성능 저하</h3>
+          <p>Spring Boot 3.2.2 마이그레이션 후 광고 송출 API 응답 시간이 1,500ms → 4,000ms로 저하. Hibernate 6 SQM 엔진이 컬렉션 fetchJoin의 Cartesian Product를 처리하는 비용이 급증한 것이 원인. 33개 테이블 한방 쿼리를 ID 조회 → 엔티티 로딩 2단계로 분할하고 컬렉션은 Hibernate.initialize + batch fetch로 지연 초기화하여 prod 응답 시간 ~500ms, RDS CPU 45% → 20% 달성.</p>
+          <div class="ts-tech">
+            <span>Hibernate 6</span>
+            <span>QueryDSL</span>
+            <span>Spring Boot</span>
+            <span>PostgreSQL</span>
+          </div>
+        </a>
+
         <a href="ts-elasticsearch.html" class="ts-card">
           <div class="ts-card-header">
             <span class="ts-date">2025.12.22</span>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Hibernate 6 마이그레이션 후 API 성능 저하 해결">
+  <title>Hibernate 6 마이그레이션 후 API 성능 저하 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>Hibernate 6 마이그레이션 후 API 성능 저하</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.05</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Hibernate 6 / QueryDSL / Spring Boot / PostgreSQL</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">작업 기간</h2>
+        <p>2026년 5월 (약 2주)</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>Spring Boot 2.7.7 → 3.2.2, Hibernate 5 → 6 마이그레이션 후 광고 송출 동기화 API의 응답 시간이 크게 저하</li>
+          <li>prod 환경: <strong>1,500ms → 4,000ms (약 2.6배 저하)</strong></li>
+          <li>dev 환경: 1,662ms → 3,320ms</li>
+          <li>마이그레이션 후 RDS CPU 사용량이 100%까지 치솟는 현상 발생</li>
+          <li>해당 API는 33개 테이블을 JOIN하는 단일 쿼리로, 광고 송출 대상 데이터를 한 번에 로딩</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+
+        <div class="ts-subsection">
+          <h4>Hibernate 5 vs Hibernate 6 ResultSet 처리 방식 차이</h4>
+          <ul>
+            <li><strong>Hibernate 5 (TwoPhaseLoad):</strong> ResultSet에서 row 단위로 엔티티를 생성 → 212개 엔티티 materializations</li>
+            <li><strong>Hibernate 6 (ResultsHelper + SQM 엔진):</strong> 전체 ResultSet을 먼저 읽은 후 엔티티 그래프를 일괄 구성 → 961개 collection initializations</li>
+          </ul>
+          <p>33개 테이블을 JOIN하는 쿼리에서 <strong>컬렉션 fetchJoin이 Cartesian Product를 발생</strong>시켜 ResultSet 행 수가 기하급수적으로 증가. Hibernate 6의 SQM 엔진은 이 거대한 ResultSet 처리에서 Hibernate 5 대비 성능 저하가 심함.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>fetchJoin 유형별 영향</h4>
+          <ul>
+            <li><strong>단일 엔티티 fetchJoin (ManyToOne, OneToOne):</strong> 행 수 증가 없음 → 제거 시 오히려 추가 SELECT 발생으로 성능 악화</li>
+            <li><strong>컬렉션 fetchJoin (OneToMany, ManyToMany):</strong> 행 수를 곱셈으로 증가시킴 → 제거 대상</li>
+            <li><strong>WHERE 조건으로 필터링하는 컬렉션:</strong> fetchJoin 유지 필요 (lazy loading은 WHERE 조건을 무시함)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">시도한 해결책들</h2>
+
+        <div class="ts-subsection">
+          <h4>시도 1: distinct 제거만 적용 (부분 개선, 채택 불가)</h4>
+          <ul>
+            <li>원본 쿼리에서 <code>.distinct()</code>만 제거</li>
+            <li>결과: 3,320ms → <strong>2,034ms (39% 개선)</strong></li>
+            <li>Hibernate 6는 fetchJoin 시 application-level 중복 제거를 자동 수행하므로 SQL DISTINCT가 불필요</li>
+            <li><strong>채택 불가:</strong> 중복 행이 그대로 Hibernate에 전달되어 완전한 해법이 아님</li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>시도 2: @Fetch(FetchMode.SELECT) + @BatchSize (악화)</h4>
+          <ul>
+            <li>도메인 엔티티 컬렉션 필드에 어노테이션 추가</li>
+            <li>결과: <strong>2~3배 느려짐 (7,197ms ~ 10,250ms)</strong></li>
+            <li>원인: <code>@Fetch(FetchMode.SELECT)</code>는 쿼리 코드의 <code>.fetchJoin()</code>을 오버라이드하지 않음 → fetchJoin으로 JOIN 로딩 + SELECT로 추가 로딩이 <strong>이중으로 발생</strong></li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>시도 3: 쿼리 분할 + 원본 fetchJoin 유지 (악화)</h4>
+          <ul>
+            <li>33개 테이블 한방 쿼리를 2단계로 분할하되 fetchJoin은 유지</li>
+            <li>결과: <strong>3배 느려짐 (~10,250ms)</strong></li>
+            <li>원인: 2단계 쿼리에서 동일한 Cartesian Product가 그대로 발생. fetchJoin 자체가 병목이므로 분할만으로는 효과 없음</li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>시도 4: 컬렉션 fetchJoin 제거 + Hibernate.initialize() (1차 개선)</h4>
+          <ul>
+            <li>13개 컬렉션 fetchJoin 제거 후, <code>Hibernate.initialize()</code>로 트랜잭션 내 강제 초기화</li>
+            <li><code>default_batch_fetch_size: 100</code> 설정으로 lazy loading이 <code>WHERE id IN (?, ?, ..., ?)</code> 배치 쿼리로 실행되게 변경</li>
+            <li>결과: prod <strong>4,000ms → 2,167ms (46% 개선)</strong></li>
+            <li>한방 쿼리의 WHERE 복잡도가 여전히 SQM에 부담이 되어 추가 최적화 필요</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+
+        <div class="ts-highlight">
+          <p><strong>최종 해결:</strong> 시도 4의 fetchJoin 제거 + Hibernate.initialize 전략에 <strong>쿼리 분할(ID 조회 → 엔티티 로딩)</strong>을 추가하여 SQM 부담을 최소화.</p>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>1단계: ID만 SELECT (엔티티 하이드레이션 없음)</h4>
+          <p>복잡한 WHERE 조건을 여기서 모두 처리. fetchJoin 없이 ID만 가져오므로 SQM 하이드레이션 비용 제로.</p>
+          <div class="ts-code-block">
+            <code>val creativeIds = queryFactory.select(creative.id)
+    .from(creative)
+    .join(creative.ad, ad)
+    .join(...) // WHERE 필터링에 필요한 JOIN만 (18개)
+    .where(...) // 전체 WHERE 조건 (credit 서브쿼리, 날짜, 스케줄 등)
+    .distinct().fetch()</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>2단계: 엔티티 로딩 (단일 엔티티 fetchJoin만)</h4>
+          <p><code>WHERE id IN (...)</code> 기반 단순 조회. 행 수에 영향이 없는 단일 엔티티 fetchJoin은 유지.</p>
+          <div class="ts-code-block">
+            <code>val creatives = queryFactory.selectFrom(creative)
+    .join(creative.ad, ad).fetchJoin()
+    .join(creative.mediaContents, mediaContent).fetchJoin() // WHERE 필터링 필요
+    .join(ad.adGroup, adGroup).fetchJoin()
+    .join(...) // 단일 엔티티 fetchJoin만 (16개)
+    .where(creative.id.in(creativeIds), ...)
+    .distinct().fetch()</code>
+          </div>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>3단계: 컬렉션 강제 초기화 (Hibernate.initialize + batch fetch)</h4>
+          <p>트랜잭션 내에서 lazy 컬렉션을 batch fetch로 한 번에 초기화. 앱이 트랜잭션 외부에서 엔티티를 사용하므로 LazyInitializationException 회피.</p>
+          <div class="ts-code-block">
+            <code>Hibernate.initialize(creative.placementGroup?.placementGroupPlacements)
+creative.placementGroup?.placementGroupPlacements?.forEach { pgp ->
+    Hibernate.initialize(pgp.placement)
+}
+Hibernate.initialize(ad.autoEnabledSchedules)
+Hibernate.initialize(adGroup.slots)
+// ... 나머지 13개 컬렉션 초기화
+
+# application.yaml (전체 14개 프로필)
+spring.jpa.properties.hibernate.default_batch_fetch_size: 100</code>
+          </div>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>성능 결과:</strong></p>
+          <ul>
+            <li>prod DB: 1,500ms (SB2) → 4,000ms (SB3 직후) → <strong>~500ms (최적화 후)</strong></li>
+            <li>stg 파드 안정화 후: <strong>~350ms (235~800ms)</strong> — SB2 prod 대비 약 4배 빠름</li>
+            <li>RDS CPU 사용량: <strong>45% → 20%로 감소</strong></li>
+          </ul>
+        </div>
+
+        <div class="ts-subsection">
+          <h4>환경별 응답 시간 비교</h4>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
+            <thead>
+              <tr style="border-bottom: 2px solid #e5e7eb;">
+                <th style="text-align: left; padding: 8px;">환경</th>
+                <th style="text-align: left; padding: 8px;">SB2 (Hibernate 5)</th>
+                <th style="text-align: left; padding: 8px;">SB3 마이그레이션 직후</th>
+                <th style="text-align: left; padding: 8px;">최적화 후</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 8px;">dev DB</td>
+                <td style="padding: 8px;">~1,662ms</td>
+                <td style="padding: 8px;">~3,320ms</td>
+                <td style="padding: 8px;">~1,613ms</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 8px;">prod DB</td>
+                <td style="padding: 8px;">~1,500ms</td>
+                <td style="padding: 8px;">~4,000ms</td>
+                <td style="padding: 8px;"><strong>~500ms</strong></td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;">stg 파드 (안정화)</td>
+                <td style="padding: 8px;">-</td>
+                <td style="padding: 8px;">-</td>
+                <td style="padding: 8px;"><strong>~350ms</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>Hibernate 6 SQM 엔진은 ResultSet을 일괄 구성하므로, 컬렉션 fetchJoin이 많은 쿼리는 Hibernate 5보다 성능 페널티가 큽니다. 마이그레이션 시 성능 회귀 검증이 필수입니다.</li>
+          <li>"fetchJoin이 곧 N+1 회피"라는 통념은 Hibernate 6에서 위험합니다. 컬렉션 fetchJoin은 Cartesian Product 비용을 먼저 따져야 합니다.</li>
+          <li>단일 엔티티 fetchJoin(ManyToOne/OneToOne)은 행 수를 늘리지 않으므로 유지하는 것이 낫습니다. lazy로 전환하면 추가 SELECT가 발생해 오히려 악화될 수 있습니다.</li>
+          <li>WHERE 조건으로 필터링하는 컬렉션은 lazy loading으로 전환할 수 없습니다. 이런 컬렉션은 fetchJoin을 유지하되, 다른 컬렉션은 <code>Hibernate.initialize() + default_batch_fetch_size</code> 조합으로 처리하는 것이 효과적입니다.</li>
+          <li>복잡한 한방 쿼리는 <strong>ID 조회 → 엔티티 로딩</strong>의 2단계 분할이 SQM 부담을 크게 줄입니다. WHERE 복잡도와 엔티티 하이드레이션을 분리하면 두 단계 모두 가벼워집니다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
