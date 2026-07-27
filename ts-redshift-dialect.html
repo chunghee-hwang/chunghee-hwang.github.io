@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Hibernate 6 이중 데이터소스(Redshift/RDS) 호환성 문제 해결">
+  <title>Hibernate 6 이중 데이터소스(Redshift/RDS) 호환성 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>Hibernate 6 이중 데이터소스(Redshift/RDS) 호환성 문제</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.06</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Hibernate 6 / Spring Boot 3 / QueryDSL / PostgreSQL / Redshift</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">배경</h2>
+        <p>통계 조회는 기간에 따라 데이터소스가 나뉜다. <strong>최근 2년 이내는 RDS(PostgreSQL)</strong>, <strong>2년 이전은 Redshift</strong>에서 조회하는 하이브리드 구조다. Spring Boot 3 / Hibernate 6 마이그레이션 이후 2년 이전(Redshift) 조회 경로에서 오류가 다발했다.</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">문제 1 · Redshift에서 페이지네이션 SQL 구문 오류</h2>
+        <div class="ts-subsection">
+          <h4>원인</h4>
+          <ul>
+            <li>Hibernate 6의 PostgreSQLDialect가 페이지네이션 SQL을 <code>LIMIT ? OFFSET ?</code> → <strong><code>OFFSET ? ROWS FETCH FIRST ? ROWS ONLY</code>(SQL:2008 표준)</strong>로 변경</li>
+            <li>Redshift는 이 표준 구문을 지원하지 않아 구문 오류 발생</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>해결</h4>
+          <ul>
+            <li>Redshift용 Dialect의 <code>getLimitHandler()</code>를 오버라이드해 <code>LIMIT/OFFSET</code> 구문을 강제(LimitLimitHandler)</li>
+            <li>Hibernate 6의 기타 SQL 생성 변경사항(RETURNING, Sequence, FOR UPDATE, Array, DISTINCT ON 등)에 대해 Redshift 호환성을 전수 검토 후 영향 없음 확인</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">문제 2 · 잘못된 EntityManager로 엔티티 미인식</h2>
+        <div class="ts-subsection">
+          <h4>원인</h4>
+          <ul>
+            <li>Redshift를 쓰지 않는 일부 환경에서 2년 이전 조회 시 <code>UnknownEntityException</code>(예: <code>r_stats_daily</code> resolve 실패)</li>
+            <li>QueryDSL 팩토리 구성이 Redshift용 쿼리 팩토리를 만들면서 <strong>PostgreSQL용 EntityManager를 주입</strong>해, Redshift 전용 엔티티를 인식하지 못함</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>해결</h4>
+          <p>해당 구성이 <strong>Redshift 전용 EntityManager</strong>를 사용하도록 교정.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">문제 3 · 뷰 컬럼 누락으로 조회 불가</h2>
+        <ul>
+          <li>Redshift의 통계 뷰에 특정 컬럼(<code>media_content_id</code>)이 누락되어 2년 이전 데이터 조회가 실패</li>
+          <li>뷰에 컬럼을 추가하고, 데이터 카탈로그의 union 대상 테이블을 전수 확인해 정합성 확보</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>ORM 마이그레이션은 <strong>생성되는 SQL 방언 자체가 바뀔 수 있다.</strong> 특히 PostgreSQL 호환을 표방하지만 표준 구문 지원이 다른 Redshift 같은 백엔드에서는 별도 검증이 필수다.</li>
+          <li>멀티 데이터소스 환경에서는 각 소스에 맞는 <strong>Dialect와 EntityManager 매핑 정합성</strong>을 반드시 확인해야 한다.</li>
+          <li>기간에 따른 데이터소스 분기처럼 평소 잘 안 타는 경로일수록 마이그레이션 회귀에서 놓치기 쉽다 — 경로별 스모크 테스트가 유효하다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

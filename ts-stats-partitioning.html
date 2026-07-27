@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="대용량 통계 테이블 파티셔닝으로 시간 단위 조회 성능 개선">
+  <title>대용량 통계 테이블 파티셔닝 성능 개선 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>대용량 통계 테이블 파티셔닝으로 시간 단위 조회 성능 개선</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.06</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>PostgreSQL / RANGE Partitioning / JPA / Airflow</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>시간(hour) 단위 통계 보고서를 <code>date</code>, <code>hour</code>로 필터링해 조회할 때 응답이 5초를 넘어가고, 전체 매체 대상 조회는 30초를 초과해 타임아웃 발생</li>
+          <li>운영 대상 테이블(prod): 총 <strong>약 3,312만 행</strong>, 테이블 15GB, <strong>인덱스 포함 43GB</strong>, 하루 평균 약 45,000행 적재</li>
+          <li>재현 쿼리(운영 보고서, 6일 조회) EXPLAIN ANALYZE 기준 <strong>5,719ms</strong>, 그중 <strong>I/O 대기가 5,279ms(95.6%)</strong>, 디스크 블록 읽기 41,510건</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+        <div class="ts-subsection">
+          <h4>테이블이 큰 이유: 차원 폭발(Dimensional Explosion)</h4>
+          <p><code>screen · gender · os · age</code> 차원이 조합을 5~6배로 불려 행 수가 급증. 정작 운영 보고서에서는 이 차원을 GROUP BY에 쓰지 않고 SUM 합산만 수행한다.</p>
+        </div>
+        <div class="ts-subsection">
+          <h4>근본 원인: 워킹셋이 메모리를 초과</h4>
+          <ul>
+            <li>조회 인덱스는 이미 최적으로 타고 있었음 — <strong>쿼리 튜닝으로 개선할 여지가 없는 상태</strong></li>
+            <li>테이블·인덱스 크기(43GB)가 <code>shared_buffers</code>에 상주하지 못해, 캐시가 없는 콜드 쿼리에서 대량의 랜덤 I/O가 발생하는 것이 병목</li>
+            <li>즉 SQL이 아니라 <strong>테이블 구조(물리 레이아웃)</strong> 문제 → 파티셔닝으로 스캔 대상 자체를 줄여야 함</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+        <div class="ts-highlight">
+          <p><strong>date 기준 월별 RANGE 파티셔닝 + 인덱스 선두 컬럼을 date로 재정렬.</strong> 조회는 항상 date 범위 조건을 포함하므로, 파티션 프루닝으로 대상 월의 파티션만 스캔하게 된다.</p>
+        </div>
+        <div class="ts-subsection">
+          <h4>1. 파티셔닝 및 인덱스 재설계</h4>
+          <ul>
+            <li>월별 RANGE 파티셔닝(<code>PARTITION BY RANGE (date)</code>) 적용, 미래 파티션은 월 1회 실행 배치에서 미리 생성</li>
+            <li>선두 컬럼이 <code>campaign_id/ad_group_id/ad_id</code>였던 인덱스를 <strong><code>date</code> 선두</strong>로 재정렬 → 날짜 범위 필터 후 인덱스 스캔 가능</li>
+            <li><strong>애플리케이션 코드 변경 없음</strong> — PostgreSQL이 파티션 프루닝/라우팅을 자동 처리</li>
+            <li>운영/설치형(PG 16 / PG 14) 혼재 환경에서 pg_partman 없이 수동 파티션 + Airflow DAG로 통일 (설치형은 superuser 부재로 확장 불가)</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>2. 서비스 영향 없는 전환 (사전 복사 + 테이블명 스왑)</h4>
+          <ul>
+            <li>신규 파티션 테이블에 원본을 <code>ON CONFLICT DO UPDATE</code>(멱등)로 며칠에 걸쳐 사전 복사</li>
+            <li>전환 시점에 배치 스케줄만 잠깐 멈추고 한 트랜잭션 내에서 테이블명 스왑 — RENAME은 메타데이터 변경이라 즉시 완료, 백엔드에서 빈 데이터가 보이는 순간이 없음</li>
+          </ul>
+          <div class="ts-code-block">
+            <code>BEGIN;
+ALTER TABLE stats_operation      RENAME TO stats_operation_old;
+ALTER TABLE stats_operation_part RENAME TO stats_operation;
+COMMIT;</code>
+          </div>
+        </div>
+        <div class="ts-subsection">
+          <h4>3. 데이터 삭제 DAG 개선 (DELETE → DROP PARTITION)</h4>
+          <p>2년 경과 데이터 정리를 행 단위 <code>DELETE</code>(느림·VACUUM 필요)에서 <strong>파티션 DROP</strong>으로 전환. 즉시 처리되며 VACUUM이 불필요하고, <code>DETACH ... CONCURRENTLY</code>로 서비스 영향 없이 제거.</p>
+        </div>
+
+        <div class="ts-success">
+          <p><strong>성능 결과 (콜드 쿼리 기준):</strong></p>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
+            <thead>
+              <tr style="border-bottom: 2px solid #e5e7eb;">
+                <th style="text-align: left; padding: 8px;">조회</th>
+                <th style="text-align: left; padding: 8px;">파티셔닝 전</th>
+                <th style="text-align: left; padding: 8px;">파티셔닝 후</th>
+                <th style="text-align: left; padding: 8px;">개선</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 8px;">운영 보고서 (매체별)</td>
+                <td style="padding: 8px;">14.32초</td>
+                <td style="padding: 8px;"><strong>0.34초</strong></td>
+                <td style="padding: 8px;"><strong>42배</strong></td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 8px;">게재 보고서 (매체별)</td>
+                <td style="padding: 8px;">3.72초</td>
+                <td style="padding: 8px;">0.87초</td>
+                <td style="padding: 8px;">4.3배</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 8px;">운영 보고서 (전체 매체)</td>
+                <td style="padding: 8px;">33.26초</td>
+                <td style="padding: 8px;">6.78초</td>
+                <td style="padding: 8px;">4.9배</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px;">게재 보고서 (전체 매체)</td>
+                <td style="padding: 8px;">32.64초</td>
+                <td style="padding: 8px;">4.98초</td>
+                <td style="padding: 8px;">6.6배</td>
+              </tr>
+            </tbody>
+          </table>
+          <p style="margin-top: 12px;">매체별 조회는 전 보고서 1초 이내로 개선되어 기존 타임아웃 이슈가 완전히 해소되었고, dev·운영 등 전 환경 마이그레이션을 완료했다.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>인덱스가 최적이어도 <strong>워킹셋이 메모리를 초과</strong>하면 콜드 쿼리에서 랜덤 I/O가 병목이 된다. 쿼리 튜닝이 아니라 물리 구조를 봐야 한다.</li>
+          <li>조회가 항상 특정 컬럼(여기선 date)으로 범위 필터링된다면, 그 컬럼 기준 파티셔닝의 <strong>파티션 프루닝</strong>이 가장 확실한 해법이다.</li>
+          <li>복합 인덱스의 선두 컬럼은 실제 조회 패턴(범위 필터 컬럼)에 맞춰야 인덱스가 제대로 활용된다.</li>
+          <li>대용량 테이블 구조 변경은 <strong>사전 복사 + 테이블명 스왑</strong>으로 서비스 영향 없이 전환할 수 있다.</li>
+          <li>기간 만료 데이터 정리는 파티션 DROP이 행 단위 DELETE보다 훨씬 저렴하다(VACUUM 불필요).</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

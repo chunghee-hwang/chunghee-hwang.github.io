@@ -38,6 +38,81 @@
   <section class="section ts-list-section">
     <div class="container">
       <div class="ts-cards">
+        <a href="ts-report-memory.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.07</span>
+            <span class="ts-tag">Performance</span>
+          </div>
+          <h3>보고서 생성 배치 파이프라인 메모리 90% 절감</h3>
+          <p>보고서 배치 워커의 메모리 부족 문제. DB 결과를 DataFrame → dict → JSON으로 3중 복제하던 구조를, 쿼리 결과를 스테이징 테이블에 직접 적재(CTAS)하고 백엔드는 테이블명만 받아 스트리밍(POI SXSSF)으로 엑셀을 생성하는 방식으로 재설계. 데이터를 앱 메모리로 옮기지 않도록 바꿔 메모리 약 90% 절감(정합성 검증 완료).</p>
+          <div class="ts-tech">
+            <span>Airflow</span>
+            <span>Redshift</span>
+            <span>PostgreSQL</span>
+            <span>Apache POI</span>
+          </div>
+        </a>
+
+        <a href="ts-container-security.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.07</span>
+            <span class="ts-tag">Security</span>
+          </div>
+          <h3>컨테이너 이미지 보안 스캔 자동화 및 취약점 패치</h3>
+          <p>빌드 파이프라인에 취약점 스캔(Trivy)을 통합해 HIGH 등급 발견 시 빌드를 실패시키는 게이트를 구축. 스캐너 버전은 고정하고 취약점 DB는 자동 최신화. ML 추론 서비스 베이스 이미지·런타임 교체로 원격코드실행(CRITICAL) 등 해소, OS 패키지 취약점 43건 → 0건. 스트림 서비스 의존성 CVE도 다수 제거.</p>
+          <div class="ts-tech">
+            <span>Trivy</span>
+            <span>Docker</span>
+            <span>AWS CodeBuild</span>
+            <span>TorchServe</span>
+          </div>
+        </a>
+
+        <a href="ts-stats-partitioning.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.06</span>
+            <span class="ts-tag">Performance</span>
+          </div>
+          <h3>대용량 통계 테이블 파티셔닝으로 시간 단위 조회 성능 개선</h3>
+          <p>약 3,300만 행(인덱스 포함 43GB) 통계 테이블의 시간 단위 조회가 최대 30초를 초과. 인덱스는 최적이나 테이블 크기가 메모리 버퍼에 상주하지 못해 콜드 쿼리 시 랜덤 I/O가 병목이었고(I/O 대기 95%), date 기준 월별 RANGE 파티셔닝과 인덱스 재정렬로 해결. 사전 복사 후 테이블명 스왑으로 서비스 영향 없이 전환. 콜드 쿼리 기준 보고서 조회 14.3초 → 0.34초(최대 42배) 개선.</p>
+          <div class="ts-tech">
+            <span>PostgreSQL</span>
+            <span>RANGE Partitioning</span>
+            <span>JPA</span>
+            <span>Airflow</span>
+          </div>
+        </a>
+
+        <a href="ts-inmemory-pagination.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.06</span>
+            <span class="ts-tag">Performance</span>
+          </div>
+          <h3>fetch join + 페이지네이션 인메모리 페이징 문제</h3>
+          <p>컬렉션 fetch join과 Pageable을 함께 쓰면 DB LIMIT을 적용할 수 없어 전체를 로딩한 뒤 JVM 힙에서 페이징(HHH90003004)하며 파드 메모리를 압박. 27시간·2파드에서 총 1,123회 경고(상위 5개 API가 63%). 페이지 대상 ID를 먼저 조회하고 컬렉션을 batch fetch로 분리, 전역 batch fetch size 설정으로 해결.</p>
+          <div class="ts-tech">
+            <span>Hibernate 6</span>
+            <span>JPA</span>
+            <span>QueryDSL</span>
+            <span>Kubernetes</span>
+          </div>
+        </a>
+
+        <a href="ts-redshift-dialect.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.06</span>
+            <span class="ts-tag">Database</span>
+          </div>
+          <h3>Hibernate 6 이중 데이터소스(Redshift/RDS) 호환성</h3>
+          <p>기간에 따라 RDS(PostgreSQL)/Redshift로 분기되는 하이브리드 통계 조회에서, Hibernate 6가 페이지네이션 SQL을 SQL:2008 구문으로 바꿔 Redshift 구문 오류 발생. Dialect의 LimitHandler를 오버라이드해 LIMIT/OFFSET을 강제하고, 잘못 주입된 EntityManager 교정 및 뷰 컬럼 누락 보완으로 2년 이전 데이터 조회 정합성 확보.</p>
+          <div class="ts-tech">
+            <span>Hibernate 6</span>
+            <span>Redshift</span>
+            <span>PostgreSQL</span>
+            <span>QueryDSL</span>
+          </div>
+        </a>
+
         <a href="ts-hibernate6-performance.html" class="ts-card">
           <div class="ts-card-header">
             <span class="ts-date">2026.05</span>

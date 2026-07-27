@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Hibernate 6 fetch join + 페이지네이션 인메모리 페이징 문제 해결">
+  <title>fetch join + 페이지네이션 인메모리 페이징 문제 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>fetch join + 페이지네이션 인메모리 페이징으로 인한 파드 메모리 경고</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.06</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Hibernate 6 / JPA / QueryDSL / Kubernetes</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>Spring Boot 3(Hibernate 6) 전환 이후 파드 메모리 사용률이 75%를 넘는 P2 알림이 잦아짐</li>
+          <li>로그에 <code>HHH90003004: firstResult/maxResults specified with collection fetch; applying in memory</code> 경고 다발</li>
+          <li>측정 결과 <strong>27시간·2파드 기준 총 1,123회</strong>의 경고가 발생했고, 그중 <strong>상위 5개 API가 63%</strong>를 차지</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+        <ul>
+          <li>컬렉션 <code>fetch join</code>과 <code>Pageable</code>(LIMIT/OFFSET)을 함께 사용하면, fetch join으로 인해 결과 행 수와 엔티티 수가 달라져 DB 레벨 LIMIT을 적용할 수 없다</li>
+          <li>Hibernate는 정확성을 위해 <strong>전체 결과를 모두 로딩한 뒤 JVM 힙에서 페이징</strong>한다(경고 HHH90003004)</li>
+          <li>데이터가 커질수록 페이지 하나를 위해 전체 컬렉션을 메모리에 올리게 되어 파드 메모리를 압박</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+        <div class="ts-highlight">
+          <p><strong>fetch join과 페이지네이션을 분리한다.</strong> 페이지 대상 ID를 먼저 페이징으로 조회하고, 해당 ID들로 컬렉션을 batch fetch한다.</p>
+        </div>
+        <div class="ts-subsection">
+          <h4>1. 상위 5개 API 우선 수정</h4>
+          <ul>
+            <li>페이징은 ID(또는 루트 엔티티)만 대상으로 수행하고, 컬렉션은 <code>WHERE id IN (...)</code> 배치 조회로 로딩</li>
+            <li>단건 조회 API는 애초에 페이지네이션이 불필요하므로 <code>Pageable</code>을 제거하고 <code>Optional&lt;T&gt;</code> 반환으로 정리</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>2. 전역 batch fetch 설정</h4>
+          <div class="ts-code-block">
+            <code># application.yaml
+spring.jpa.properties.hibernate.default_batch_fetch_size: 100</code>
+          </div>
+          <p>lazy 컬렉션이 <code>WHERE id IN (?, ?, ...)</code> 배치 쿼리로 로딩되어 N+1을 회피하면서도 인메모리 페이징을 유발하지 않는다.</p>
+        </div>
+        <div class="ts-subsection">
+          <h4>3. 관측</h4>
+          <p>인메모리 페이징 경고(HHH90003004)의 로그 레벨을 조정해 발생 빈도를 지표로 추적, 회귀 여부를 지속 모니터링.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>컬렉션 <code>fetch join</code> + <code>Pageable</code> 조합은 조용한 안티패턴이다. 경고 없이 동작하는 것처럼 보여도 전체를 메모리에 올린다.</li>
+          <li>페이징이 필요하면 <strong>ID 페이징 → 컬렉션 batch fetch</strong> 2단계로 분리한다.</li>
+          <li>단건 조회에 습관적으로 <code>Pageable</code>을 넣지 않는다.</li>
+          <li>프레임워크 경고 로그(HHH*)는 잠재적 성능/메모리 문제의 조기 신호이므로 관측 지표로 삼는 것이 좋다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

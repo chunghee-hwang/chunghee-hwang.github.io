@@ -96,6 +96,14 @@
               <span class="skill-tag">MongoDB</span>
             </div>
           </div>
+          <div class="skill-category">
+            <h4>ML Serving</h4>
+            <div class="skill-tags">
+              <span class="skill-tag">TorchServe</span>
+              <span class="skill-tag">ONNX Runtime</span>
+              <span class="skill-tag">gRPC</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -126,6 +134,110 @@
             <div class="projects-list">
               <div class="project-item">
                 <div class="project-header" onclick="toggleProject(this)">
+                  <h4>다매체 통합 어드민 – 광고주 채널 인증/인가 체계</h4>
+                  <span class="project-period">2026.07 -</span>
+                </div>
+                <div class="project-details">
+                  <p>기존 매체사 어드민에 더해 광고주 채널을 신규 도입하면서, 레거시 권한 체계와 호환되는 채널별 인증·인가 게이트를 설계·구현. 세션 레벨 채널 마커와 광고계정 멤버십 기반 로그인 게이트, AOP 기반 역할 인가(deny-by-default), 광고주/매체 세션 상호 격리, 광고계정 스위처 API(목록·검색·선택)를 구현. 신규 채널 도입 전 유저-회사-광고계정 관계 및 권한 모델을 전수 분석하여 정책을 도출.</p>
+                  <div class="project-tech">
+                    <span>Spring Boot</span><span>Kotlin</span><span>Spring Security</span><span>Spring AOP</span><span>PostgreSQL</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>ML 추론 서버(Ranker) 개발 및 배포 자동화</h4>
+                  <span class="project-period">2026.04 - 현재</span>
+                </div>
+                <div class="project-details">
+                  <p>광고 클릭률(CTR)을 실시간 예측하는 머신러닝 추론 서버를 개발하고 배포 자동화 파이프라인을 구축. TorchServe 기반으로 23개 피쳐를 인코딩해 ONNX Runtime(GPU)으로 추론하고 gRPC로 응답. GPU 노드에 무중단 롤링 배포하며, 모델 학습 완료 → S3 업로드 → CodeBuild(.mar/이미지 빌드) → ArgoCD 자동 sync로 이어지는 배포 파이프라인을 Terraform으로 구성. 배포 게이트로 검증 지표 미달 시 자동 스킵. 추론 도입으로 CTR 약 10% 상승, 추론 지연 p95 < 30ms 목표.</p>
+                  <div class="project-tech">
+                    <span>TorchServe</span><span>ONNX Runtime</span><span>gRPC</span><span>EKS (GPU)</span><span>ArgoCD</span><span>CodeBuild</span><span>Terraform</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>대용량 통계 테이블 파티셔닝으로 시간 단위 조회 성능 개선</h4>
+                  <span class="project-period">2026.06</span>
+                </div>
+                <div class="project-details">
+                  <p>약 3,300만 행(인덱스 포함 43GB) 통계 테이블에서 시간 단위 조회가 최대 30초를 넘던 문제를 해결. 인덱스는 최적이나 테이블 크기가 메모리 버퍼에 상주하지 못해 콜드 쿼리 시 대량 랜덤 I/O가 병목이었고, date 기준 월별 RANGE 파티셔닝(파티션 프루닝)과 인덱스 컬럼 재정렬로 해결. 신규 파티션 테이블에 멱등 사전 복사 후 테이블명을 트랜잭션 내에서 스왑해 서비스 영향 없이 전환하고, 2년 경과 데이터 삭제를 파티션 DROP으로 자동화. 콜드 쿼리 기준 보고서 조회 14.3초 → 0.34초(최대 42배) 개선.</p>
+                  <div class="project-tech">
+                    <span>PostgreSQL</span><span>RANGE Partitioning</span><span>JPA</span><span>QueryDSL</span><span>Airflow</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>보고서 생성 파이프라인 메모리 최적화</h4>
+                  <span class="project-period">2026.06 - 2026.07</span>
+                </div>
+                <div class="project-details">
+                  <p>배치 워커의 메모리 부족 문제를 데이터를 메모리에 적재하지 않는 구조로 재설계. 기존 DataFrame → dict → JSON 3중 복제 구조를 스테이징 테이블(CREATE TABLE AS SELECT) 방식으로 전환하고 배치 워커는 SQL 실행만 발행하도록 변경. 백엔드는 스테이징 테이블명만 전달받아 스트리밍(POI SXSSF)으로 엑셀을 생성. 메모리 약 90% 절감(정합성 검증 완료, 배치 시간 약 10% 증가 트레이드오프).</p>
+                  <div class="project-tech">
+                    <span>Airflow</span><span>Redshift</span><span>PostgreSQL</span><span>Spring Boot</span><span>Apache POI</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>컨테이너 이미지 보안 스캔 자동화 및 취약점 패치</h4>
+                  <span class="project-period">2026.06 - 2026.07</span>
+                </div>
+                <div class="project-details">
+                  <p>도커 이미지 빌드 파이프라인에 취약점 스캔(Trivy)을 통합해 HIGH 등급 발견 시 빌드를 실패시키는 게이트를 구축. 스캐너 버전은 고정하고 취약점 DB는 자동 최신화. ML 추론 서비스의 베이스 이미지를 교체하고 런타임을 업그레이드해 원격코드실행(CRITICAL) 등을 해소, OS 패키지 취약점 43건 → 0건. 실시간 스트림 서비스의 의존성 CVE도 다수 제거.</p>
+                  <div class="project-tech">
+                    <span>Trivy</span><span>Docker</span><span>AWS CodeBuild</span><span>Kafka Streams</span><span>TorchServe</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>Hibernate 6 마이그레이션 후속 개선</h4>
+                  <span class="project-period">2026.05 - 2026.07</span>
+                </div>
+                <div class="project-details">
+                  <p>Hibernate 6 전환 이후 발생한 사이드이펙트 대응. 조회 기간에 따라 RDS/Redshift로 분기되는 하이브리드 통계 조회에서, Hibernate 6의 페이지네이션 구문 변경으로 Redshift가 구문 오류를 일으키는 문제를 Dialect 오버라이드로 해결하고 EntityManager 구성을 교정. collection fetch join + 페이지네이션 조합에서 전체 로드 후 인메모리 페이징되던 문제(파드 메모리 경고 27시간 1,123회, 상위 5개 API가 63%)를 fetch join 분리·batch fetch로 개선. EntityGraph 중복 JOIN 제거, spring-filter 라이브러리 호환 대응.</p>
+                  <div class="project-tech">
+                    <span>Hibernate 6</span><span>Spring Boot 3</span><span>QueryDSL</span><span>PostgreSQL</span><span>Redshift</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>ArchUnit 기반 아키텍처 규칙 코드화</h4>
+                  <span class="project-period">2026.02 - 2026.06</span>
+                </div>
+                <div class="project-details">
+                  <p>계층·패키지 의존성 규칙을 테스트 코드로 강제하는 ArchUnit 룰셋을 분석·수립하고 코드베이스에 적용해, 아키텍처 위반을 테스트 단계에서 검출. 전체 모듈 확대 및 CI 파이프라인 강제는 후속 과제로 설계.</p>
+                  <div class="project-tech">
+                    <span>ArchUnit</span><span>JUnit</span><span>Kotlin</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>동영상 표준형(아웃스트림) 광고 상품 개발</h4>
+                  <span class="project-period">2026.03 - 2026.06</span>
+                </div>
+                <div class="project-details">
+                  <p>아웃스트림 동영상 광고 상품의 등록/수정/조회 API와 소재스펙·레이아웃 구조를 설계·구현.</p>
+                  <div class="project-tech">
+                    <span>Spring Boot</span><span>Kotlin</span><span>PostgreSQL</span><span>JPA</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
                   <h4>Hibernate 6 마이그레이션 성능 최적화</h4>
                   <span class="project-period">2026.05</span>
                 </div>
@@ -140,7 +252,7 @@
               <div class="project-item">
                 <div class="project-header" onclick="toggleProject(this)">
                   <h4>Spring Boot 3.2.2 / Java 21 전사 마이그레이션</h4>
-                  <span class="project-period">2026.03 - 2026.04</span>
+                  <span class="project-period">2026.03 - 2026.05</span>
                 </div>
                 <div class="project-details">
                   <p>Spring Boot 2.7 EOL 대응을 위해 백엔드 10개 모듈(8개 레포 + 공용 서브모듈 2개)을 Spring Boot 3.2.2 / Java 21 / Hibernate 6로 일괄 전환. OpenRewrite로 javax → jakarta 자동 변환(267+ 파일), Spring Security 6 / Hibernate 6 dialect / @TypeDef → hypersistence-utils / JPQL is false → = false 등 호환성 이슈를 수동 보완하고, Jackson 2.15 Boolean 직렬화 변화로 깨진 API 응답은 커스텀 AnnotationIntrospector로 SB2 호환성을 유지. 변경 파일 500+, 단위 테스트 2,300+ 전체 통과 후 Kafka 기반 광고 로그 파이프라인 5단계 통합 검증 완료.</p>
@@ -290,7 +402,7 @@
             <div class="timeline-header">
               <div class="company-info">
                 <h3 class="company-name">(주) 구름</h3>
-                <span class="company-period">2021.03 - 2023.07 (2년 5개월)</span>
+                <span class="company-period">2021.03 - 2023.08 (2년 6개월)</span>
               </div>
               <div class="company-role">
                 <span class="role-title">Web Fullstack Developer</span>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="보고서 생성 배치 파이프라인 메모리 90% 절감">
+  <title>보고서 생성 파이프라인 메모리 최적화 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>보고서 생성 배치 파이프라인 메모리 90% 절감</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.07</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Airflow / Redshift / PostgreSQL / Spring Boot / Apache POI</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>보고서 생성 배치(Airflow) 워커의 메모리 사용량이 과도하게 높아 부족 현상 발생</li>
+          <li>기존 구조는 DB 조회 결과를 <strong>DataFrame → dict → JSON</strong>으로 변환하며 동일 데이터를 3중으로 복제</li>
+          <li>보고서 타겟 1건당 최대 8개 쿼리(4개 탭 × values/sum) + 추가 계산 쿼리가 모두 메모리에 적재됨</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+        <p>보고서 데이터를 <strong>배치 워커의 메모리로 끌어와 가공</strong>한 뒤 백엔드로 JSON POST하는 구조 자체가 메모리 병목이었다. 데이터를 옮길수록(쿼리 → DataFrame → dict → JSON) 복제본이 쌓이고, 타겟과 탭이 많아질수록 선형 이상으로 증가했다.</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+        <div class="ts-highlight">
+          <p><strong>데이터를 애플리케이션 메모리로 옮기지 않는다.</strong> 쿼리 결과를 스테이징 테이블에 직접 적재(CREATE TABLE AS SELECT)하고, 배치 워커는 SQL 실행 명령만 발행하며, 백엔드는 테이블명만 받아 스트리밍으로 엑셀을 생성한다.</p>
+        </div>
+        <div class="ts-subsection">
+          <h4>1. 스테이징 테이블 직접 적재 (CTAS)</h4>
+          <ul>
+            <li>배치는 <code>CREATE TABLE AS SELECT ...</code>로 결과를 스테이징 테이블에 바로 생성 — 데이터를 메모리에 올리지 않음</li>
+            <li>소스 DB와 스테이징 대상이 동일 DB이므로 크로스 DB 전송·추가 인프라 불필요. 환경별로 클라우드(Redshift) / 설치형(PostgreSQL) 스테이징으로 분기</li>
+            <li>스테이징 테이블은 UUID·epoch 네이밍으로 동시 실행 충돌을 방지하고, <code>finally</code> + DAG cleanup 스텝의 이중 안전장치로 orphan 테이블 정리</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>2. 백엔드 스트리밍 엑셀 생성</h4>
+          <ul>
+            <li>백엔드는 스테이징 테이블명만 전달받아, <strong>Apache POI SXSSF(스트리밍 워크북)</strong>로 탭별 순차 처리하며 엑셀을 생성 — 전체를 메모리에 올리지 않음</li>
+          </ul>
+        </div>
+        <div class="ts-success">
+          <p><strong>결과:</strong></p>
+          <ul>
+            <li>배치 워커 메모리 <strong>약 90% 절감</strong></li>
+            <li>개선 전/후 보고서 데이터 정합성 검증 완료</li>
+            <li>테이블 생성·조회 단계가 추가되어 배치 시간은 약 10% 증가(수용 가능한 트레이드오프)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>대용량 리포트는 <strong>데이터를 앱 메모리로 옮기지 말고 DB에 둔 채 참조</strong>(테이블명 전달)하는 편이 메모리 관점에서 압도적으로 유리하다.</li>
+          <li>중간 표현을 여러 번 변환(DataFrame → dict → JSON)하면 복제본이 쌓인다. 변환 단계 자체를 줄이는 설계가 근본 해법이다.</li>
+          <li>엑셀 등 파일 생성은 스트리밍 API(POI SXSSF)로 처리해 힙 사용을 억제한다.</li>
+          <li>스테이징 테이블 전략은 동시 실행 충돌 방지(고유 네이밍)와 orphan 정리(이중 안전장치)를 함께 설계해야 안전하다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="컨테이너 이미지 취약점 스캔 자동화 및 CVE 패치">
+  <title>컨테이너 이미지 보안 스캔 자동화 및 취약점 패치 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>컨테이너 이미지 보안 스캔 자동화 및 취약점 패치</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.07</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Trivy / Docker / AWS CodeBuild / TorchServe</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">배경</h2>
+        <p>실시간 통계 스트림 서비스와 ML 추론 서비스의 컨테이너 이미지·의존성에 다수의 취약점(CVE)이 존재했고, 배포 전에 이를 걸러낼 자동화된 게이트가 없었다. 취약점 패치와 함께 빌드 파이프라인에 스캔을 상시화하는 것이 목표였다.</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+        <div class="ts-subsection">
+          <h4>1. 빌드 파이프라인에 취약점 스캔 자동화</h4>
+          <ul>
+            <li>도커 이미지 빌드 단계에 Trivy 스캔을 통합, <strong>HIGH 등급 취약점 발견 시 빌드를 실패</strong>시키는 게이트 적용</li>
+            <li>스캐너(엔진) 버전은 파라미터 스토어로 고정하고, 취약점 DB는 OCI 아티팩트로 별도 배포되어 매 실행 시 자동 최신화 → <strong>재현성/공급망 안정성과 CVE 최신성을 동시에 확보</strong></li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>2. ML 추론 서비스 이미지 재구성</h4>
+          <ul>
+            <li>베이스 이미지를 Ubuntu 20.04 → Debian 12 slim으로 전환, 런타임을 Python 3.9 → 3.11로, torch 2.6.0 적용</li>
+            <li>torch 원격코드실행(<code>CVE-2025-32434</code>, CRITICAL) 등 주요 취약점을 근본 해소, 베이스/앱 이미지를 분리</li>
+            <li>결과: <strong>OS 패키지 취약점 43건 → 0건</strong></li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>3. 실시간 스트림 서비스 2종 의존성 패치</h4>
+          <ul>
+            <li>PostgreSQL 드라이버, Avro, jackson-core 등의 CVE를 최신 보안 버전으로 해결</li>
+            <li>두 서비스 합산 <strong>CRITICAL 3건 · HIGH 5건 제거</strong>(서비스별 CRITICAL 2 + HIGH 3 / CRITICAL 1 + HIGH 2)</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>4. 잔여 취약점 처리 원칙</h4>
+          <p>Spring Boot·Kafka처럼 버전 업 리스크가 큰 대형 프레임워크의 잔여 취약점은 무리하게 올리지 않고, <strong>미조치 사유를 명시해 수용</strong>. 베이스 이미지는 HIGH/CRITICAL 0건 상태를 유지하도록 관리.</p>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>스캐너 <strong>엔진 버전 고정</strong>과 <strong>취약점 DB 자동 최신화</strong>는 상충하지 않는다. 둘을 분리하면 재현성과 최신성을 함께 얻는다.</li>
+          <li>런타임·베이스 이미지 교체가 개별 의존성 패치보다 더 많은 CVE를 한 번에 해소하는 경우가 많다(베이스/앱 이미지 분리도 유효).</li>
+          <li>보안 패치는 "전부 최신화"가 아니라 <strong>영향도·리스크 기반 선별</strong>이 현실적이다. 미조치 항목은 사유를 남겨 추적 가능하게 한다.</li>
+          <li>빌드 실패 게이트가 있어야 취약점이 슬그머니 배포되는 것을 막을 수 있다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
