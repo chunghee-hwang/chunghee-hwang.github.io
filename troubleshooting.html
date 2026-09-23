@@ -38,6 +38,35 @@
   <section class="section ts-list-section">
     <div class="container">
       <div class="ts-cards">
+        <a href="ts-secrets-configdata.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.08</span>
+            <span class="ts-tag">Security</span>
+          </div>
+          <h3>Secrets Manager ConfigData 확장 구현 함정</h3>
+          <p>평문 자격증명을 Secrets Manager로 옮기려 Spring Boot ConfigData 확장으로 로더를 구현하며 겪은 함정 정리. 확장 등록 경로(spring.factories), 로깅 초기화 이전이라 로그가 삼켜지는 문제(ApplicationListener·FailureAnalyzer로 분리), Jackson 파싱 실패 시 예외 메시지에 시크릿이 노출되는 문제, AWS SDK HTTP 클라이언트 의존성 충돌(url-connection-client로 교체)을 해결.</p>
+          <div class="ts-tech">
+            <span>Spring Boot ConfigData</span>
+            <span>AWS Secrets Manager</span>
+            <span>Jackson</span>
+          </div>
+        </a>
+
+        <a href="ts-cloudfront-partition.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.08</span>
+            <span class="ts-tag">Data Pipeline</span>
+          </div>
+          <h3>CloudFront 로그 집계 — 파티션·타임존·등록 방식</h3>
+          <p>CloudFront 로그를 Athena/Redshift Spectrum으로 집계하며 만난 세 가지 함정. 파티션 키를 int로 선언하면 zero-pad가 사라져 BETWEEN 범위가 조용히 깨지는 문제(string으로 선언), 로그가 UTC라 KST 변환 없이 9시간 밀리는 문제(파티션·시각 양쪽 CONVERT_TIMEZONE), 파티션 프로젝션은 Athena 전용이라 Redshift가 못 읽는 문제(MSCK REPAIR로 통일)를 실측으로 검증하며 해결.</p>
+          <div class="ts-tech">
+            <span>CloudFront</span>
+            <span>Athena</span>
+            <span>Redshift Spectrum</span>
+            <span>Glue</span>
+          </div>
+        </a>
+
         <a href="ts-report-memory.html" class="ts-card">
           <div class="ts-card-header">
             <span class="ts-date">2026.07</span>
@@ -110,6 +139,21 @@
             <span>Redshift</span>
             <span>PostgreSQL</span>
             <span>QueryDSL</span>
+          </div>
+        </a>
+
+        <a href="ts-hibernate6-timezone.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.05</span>
+            <span class="ts-tag">Backend</span>
+          </div>
+          <h3>Hibernate 6 타임존 정규화 변경으로 인한 9시간 시프트 장애</h3>
+          <p>Spring Boot 3 / Hibernate 6 배포 후 집행 기간이 9시간 어긋나 저장되고 화면 일시가 빠르게 표시되는 장애 발생. Hibernate 6의 timezone default_storage 기본값이 NORMALIZE_UTC로 바뀌며 읽은 OffsetDateTime의 offset이 +09:00 → +00:00으로 변했고, 이 offset을 재사용해 시각을 합성하던 코드가 9시간 시프트됐다. 설정으로 기존 동작을 복원하고, now() 호출을 TimeUtils로 일원화한 뒤 ArchUnit 룰로 재발을 방지.</p>
+          <div class="ts-tech">
+            <span>Hibernate 6</span>
+            <span>Spring Boot 3</span>
+            <span>OffsetDateTime</span>
+            <span>PostgreSQL</span>
           </div>
         </a>
 

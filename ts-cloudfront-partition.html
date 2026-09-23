@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="CloudFront 로그 집계에서 파티션 키 타입·UTC 타임존·파티션 등록 방식으로 겪은 문제 해결">
+  <title>CloudFront 로그 집계 파티션·타임존 트러블슈팅 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>CloudFront 로그 집계 — 파티션 키 타입·타임존·등록 방식</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.08</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>CloudFront / Athena / Redshift Spectrum / Glue</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">배경</h2>
+        <p>광고 노출·클릭을 CloudFront 표준 로그(v2)로 받아 Athena/Redshift Spectrum으로 집계하는 파이프라인을 구축하며, 파티션과 타임존에서 세 가지 문제를 만났다. 모두 <strong>에러 없이 조용히 틀린 결과</strong>를 낼 수 있는 유형이라 실측으로 확인했다.</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">문제 1 · 파티션 키를 int로 선언하면 범위 조회가 깨진다</h2>
+        <div class="ts-subsection">
+          <h4>원인</h4>
+          <ul>
+            <li>CloudFront v2의 Hive 경로는 <code>month=08</code>처럼 <strong>zero-pad된 문자열</strong>로 떨어진다.</li>
+            <li>파티션 키를 <code>int</code>로 선언하면 자릿수가 사라져 문자열 정렬이 무너지고, <code>BETWEEN</code>이 틀린 범위를 조용히 고른다.</li>
+          </ul>
+          <pre><code>int   : 2026+8+11+9  -> "20268119"    문자열 비교에서
+        2026+8+11+10 -> "202681110"   "202681110" < "20268119"  ← 범위가 틀어짐
+string: "2026"+"08"+"11"+"09" -> "2026081109"  자릿수 고정 → 정렬 성립</code></pre>
+        </div>
+        <div class="ts-subsection">
+          <h4>해결</h4>
+          <ul>
+            <li>파티션 키(<code>year/month/day/hour</code>)를 모두 <strong><code>string</code></strong>으로 선언. KST 하루치 24개 파티션 범위 조회가 정상 동작하는 것을 실측으로 확인.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">문제 2 · 로그가 UTC라 그대로 쓰면 9시간 밀린다</h2>
+        <div class="ts-subsection">
+          <h4>원인</h4>
+          <ul>
+            <li>CloudFront 로그는 <strong>경로도 필드도 UTC</strong>다. 집계 기준(<code>date</code>)은 KST라, 변환 없이 쓰면 하루가 9시간 어긋난다.</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>해결</h4>
+          <ul>
+            <li>파티션 조건과 시각 컬럼 <strong>양쪽 모두</strong> KST로 변환. KST 하루 D = UTC 전일 15시 ~ 당일 14시로 범위를 잡고, 시각은 <code>CONVERT_TIMEZONE</code>으로 변환.</li>
+            <li>AWS가 KST 파티션을 지원하지 않아(설정에 타임존 옵션 없음) 쿼리에서 변환하는 방식을 택했다. 경계값(UTC 14시 → KST 23시 전일 / 15시 → KST 0시 당일)이 1:1로 떨어지는 것을 실측 확인.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">문제 3 · 파티션 프로젝션을 쓰면 Redshift가 못 읽는다</h2>
+        <div class="ts-subsection">
+          <h4>원인 / 선택</h4>
+          <ul>
+            <li>파티션 프로젝션은 <strong>Athena 전용</strong>이라, 같은 Glue 테이블을 Redshift Spectrum이 집계에 쓸 수 없게 된다.</li>
+            <li>집계 엔진을 Redshift Spectrum으로 두기로 한 결정과 충돌하는 지점이었다.</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>해결</h4>
+          <ul>
+            <li>파티션 등록을 <strong><code>MSCK REPAIR</code></strong>(카탈로그 등록) 방식으로 통일해 두 엔진이 같은 테이블을 읽게 했다.</li>
+            <li>90일 보존 기준 파티션이 최대 2,160개라, 실측상 MSCK 부담은 수 초 수준으로 운영에 무리가 없었다.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>파티션·타임존 문제는 <strong>예외를 던지지 않고 조용히 틀린 값</strong>을 낸다. 경계값을 직접 넣어 왕복 검증하는 것이 유일한 안전장치다.</li>
+          <li>"PostgreSQL 호환"을 표방해도 Athena·Redshift는 <strong>지원 기능이 다르다.</strong> 엔진 선택과 파티션 등록 방식은 함께 결정해야 한다.</li>
+          <li>관리형 서비스가 원하는 타임존을 지원하지 않으면, <strong>변환을 쿼리 계층으로 내리는</strong> 편이 파이프라인을 단순하게 유지한다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

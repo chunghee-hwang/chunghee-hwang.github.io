@@ -134,6 +134,45 @@
             <div class="projects-list">
               <div class="project-item">
                 <div class="project-header" onclick="toggleProject(this)">
+                  <h4>ArchUnit 아키텍처 규칙 전 모듈 확대 및 CI 강제</h4>
+                  <span class="project-period">2026.08 - 2026.09</span>
+                </div>
+                <div class="project-details">
+                  <p>2개 모듈에만 적용돼 있던 ArchUnit을 전체 9개 Spring Boot 모듈로 확대하고 CI 레벨에서 강제(운영계 배포 완료). 무인자 <code>now()</code> 호출·<code>@Autowired</code> 필드 주입·Controller/Service 스테레오타입·Mapper 참조 등 룰을 모듈 구조에 맞게 판별해 36개를 추가하고, 기존 룰의 오탐 9건을 제거해 freeze를 11건에서 5건으로 축소. CodeBuild 8개 프로젝트, Sonar Quality Gate, 브랜치 머지 시뮬레이션, 위반 감지까지 실측 검증. 부수적으로 상시 실패하던 domain 테스트 4건과 4개월간 멈춰있던 common의 Sonar 분석을 복구.</p>
+                  <div class="project-tech">
+                    <span>ArchUnit</span><span>Kotlin</span><span>Gradle</span><span>CodeBuild</span><span>SonarQube</span><span>ArgoCD</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>트래킹 로그 수집(CloudFront) 및 성과 집계 파이프라인 구축</h4>
+                  <span class="project-period">2026.08</span>
+                </div>
+                <div class="project-details">
+                  <p>광고 노출·클릭을 CloudFront로 수집해 집계하는 트래킹 파이프라인을 구축. CloudFront 표준 로그 v2(plain·필드선택·Hive 파티션), 엣지 Function 204 응답, S3 90일 라이프사이클을 Terraform으로 구성. 로그 형식(v1/v2, plain/parquet)을 10만 건 실측 비교하고 AWS 공개 가격표로 단가를 확인해 v2 plain을 채택. Redshift Spectrum으로 집계해 별도 통계 테이블에 적재한 뒤 기존 통계 뷰에 UNION ALL로 합류하는 Airflow DAG를 구현(UTC→KST 변환, D-1/D-2 재집계, DELETE+COPY 원자 교체). 실환경 실데이터로 비콘부터 어드민 화면·엑셀 다운로드까지 수치 일치를 검증.</p>
+                  <div class="project-tech">
+                    <span>CloudFront</span><span>Terraform</span><span>Redshift Spectrum</span><span>Athena</span><span>Airflow</span><span>Glue</span><span>S3</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
+                  <h4>application.yaml 민감정보 Secrets Manager 전환</h4>
+                  <span class="project-period">2026.08</span>
+                </div>
+                <div class="project-details">
+                  <p>application.yaml에 평문으로 있던 DB 비밀번호·연동 키 등 자격증명을 Secrets Manager로 이관해 git 이력 노출과 이미지 동봉 문제를 해소. Spring Boot ConfigData 확장으로 기동 시 한 번만 시크릿을 조회하는 로더를 구현해 8개 모듈·10개 환경(멀티 클라우드)에 적용. AWS SDK를 지원하지 않는 타 클라우드 환경은 REST API를 직접 호출하고, 운영 IAM 정책과 ArgoCD 환경변수를 보강. FailureAnalyzer로 기동 실패 원인을 진단하고 예외 메시지에 시크릿이 노출되지 않도록 차단. 실환경 파드·로컬 기동·평문 잔여 스캔까지 검증.</p>
+                  <div class="project-tech">
+                    <span>Spring Boot ConfigData</span><span>AWS Secrets Manager</span><span>Terraform</span><span>ArgoCD</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="project-item">
+                <div class="project-header" onclick="toggleProject(this)">
                   <h4>다매체 통합 어드민 – 광고주 채널 인증/인가 체계</h4>
                   <span class="project-period">2026.07 -</span>
                 </div>

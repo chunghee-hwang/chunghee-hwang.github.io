@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Hibernate 6 타임존 정규화 변경으로 인한 9시간 시프트 장애 해결">
+  <title>Hibernate 6 타임존 9시간 시프트 장애 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>Hibernate 6 타임존 정규화 변경으로 인한 9시간 시프트 장애</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.05</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Hibernate 6 / Spring Boot 3 / OffsetDateTime / PostgreSQL</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">배경</h2>
+        <p>Spring Boot 3.2.2 / Hibernate 6 마이그레이션을 배포한 다음 날, 일부 광고 상품의 <strong>집행 기간이 9시간 어긋나 저장</strong>되고 검수·게재 화면의 <strong>일시가 9시간 빠르게 표시</strong>되는 문제가 보고됐다. 인스턴트(절대 시각) 값 자체는 맞는데 오프셋만 달라지는 형태라 원인 파악이 까다로웠다.</p>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 · Hibernate 6의 타임존 저장 기본값 변경</h2>
+        <div class="ts-subsection">
+          <h4>무엇이 바뀌었나</h4>
+          <ul>
+            <li>Hibernate 6는 <code>hibernate.timezone.default_storage</code> 기본값이 <strong><code>NORMALIZE_UTC</code></strong>로 바뀌어, <code>OffsetDateTime</code>을 UTC로 정규화해 저장·조회한다.</li>
+            <li>그 결과 엔티티에서 읽은 값의 <code>.offset</code>이 Hibernate 5의 <code>+09:00</code>에서 <strong><code>+00:00</code></strong>으로 바뀌었다.</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>왜 값이 밀렸나</h4>
+          <p>기존 코드는 "JPA가 돌려주는 offset = JVM 기본 타임존 = KST"라는 우연에 기대어, <strong>엔티티에서 읽은 offset을 재사용해 wall-clock 시각을 합성</strong>하고 있었다.</p>
+          <pre><code>displayStartDate.atTime(displayStartHour, 0, 0).atOffset(startTime.offset)
+//                                                       ^^^^^^^^^^^^^^^^
+// SB2: +09:00 → KST wall-clock 그대로 저장 (정상)
+// SB3: +00:00 → UTC로 해석 → 9시간 시프트되어 저장</code></pre>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결</h2>
+        <div class="ts-subsection">
+          <h4>1. 설정으로 기존 동작 복원 (즉시 조치)</h4>
+          <pre><code>spring:
+  jpa:
+    properties:
+      hibernate:
+        timezone:
+          default_storage: NORMALIZE     # UTC 정규화 비활성화
+        jdbc:
+          time_zone: Asia/Seoul</code></pre>
+          <p>DB를 사용하는 전 모듈의 프로파일에 동일하게 적용해, 코드 변경 없이 SB2와 같은 저장·조회 동작을 복원했다.</p>
+        </div>
+        <div class="ts-subsection">
+          <h4>2. 위험 패턴 코드 수정</h4>
+          <ul>
+            <li>존을 명시하지 않고 <code>OffsetDateTime.now()</code>를 쓰던 코드를 사내 <code>TimeUtils.now()</code>(<code>Asia/Seoul</code> 고정)로 교체</li>
+            <li>잘못 저장된 데이터는 별도 스크립트로 보정</li>
+          </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>3. 재발 방지 — ArchUnit 룰</h4>
+          <ul>
+            <li>"시간 생성 메서드(<code>now</code>)는 <code>TimeUtils</code>를 통해서만 호출한다" 규칙을 테스트로 강제</li>
+            <li>"<code>OffsetDateTime</code>의 로컬 변환(<code>toLocalDate/DateTime/Time</code>)은 타임존을 명시한다" 규칙을 추가하고 기존 위반은 freeze로 점진 해소</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>ORM 메이저 업그레이드는 <strong>동작의 기본값 자체가 바뀔 수 있다.</strong> 릴리스 노트의 기본값 변경 항목을 반드시 확인해야 한다.</li>
+          <li>"현재 환경에서 우연히 맞는" 코드는 언제든 깨진다. <strong>타임존은 명시적으로 다루고 단일 창구로 강제</strong>하는 편이 안전하다.</li>
+          <li>값이 아니라 오프셋만 달라지는 버그는 눈에 잘 띄지 않는다. <strong>쓰기 → 읽기 왕복 후 offset을 검증</strong>하는 테스트가 정적 규칙보다 강하게 잡아낸다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
