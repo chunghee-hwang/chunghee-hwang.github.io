@@ -208,7 +208,7 @@
                   <span class="project-period">2025.10 - 2026.10</span>
                 </div>
                 <div class="project-details">
-                  <p>빌드 OOM(137)·30분 타임아웃을 Swap 8GB로 해결한 뒤 Kotlin 컴파일러 in-process 전략으로 Swap 사용량을 2.3GB → 240MB로 축소. 테스트 포크 병렬화와 Graviton(ARM) 전환을 비교 실측해 적용, 백엔드 빌드 34.2분 → 27.7분(-19%), 빌드당 비용 -35%. ECR 수명주기로 직전 이미지가 삭제돼 생긴 ImagePullBackOff 장애를 prod 백업 태그(멀티아키텍처 이미지 보존)로 근본 해결해 8개 레포에 적용하고 롤백 리허설까지 완료.</p>
+                  <p>빌드 OOM(137)·30분 타임아웃을 Swap 8GB로 해결한 뒤 Kotlin 컴파일러 in-process 전략으로 Swap 사용량을 2.3GB → 240MB로 축소. 테스트 포크 병렬화와 Graviton(ARM) 전환을 각각 직접 측정해 비교한 뒤 적용, 백엔드 빌드 34.2분 → 27.7분(-19%), 빌드당 비용 -35%. ECR 수명주기로 직전 이미지가 삭제돼 생긴 ImagePullBackOff 장애를 prod 백업 태그(멀티아키텍처 이미지 보존)로 재발하지 않게 해결해 8개 레포에 적용했고, 롤백은 개발계에서 미리 연습해 확인.</p>
                   <div class="project-tech">
                     <span>CodeBuild</span><span>Graviton</span><span>Gradle</span><span>ECR</span><span>Terraform</span><span>Trivy</span>
                   </div>
