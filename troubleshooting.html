@@ -38,6 +38,35 @@
   <section class="section ts-list-section">
     <div class="container">
       <div class="ts-cards">
+        <a href="ts-deliverer-timeout.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.10</span>
+            <span class="ts-tag">Performance</span>
+          </div>
+          <h3>광고 송출 서버 타임아웃 — 선필터와 동기화 쿼리 개선</h3>
+          <p>요청마다 전체 소재를 DTO로 변환한 뒤 거르던 구조를 게재위치 선필터로 바꾸고, 기간 조건 없이 구좌 약 71만 행을 읽던 동기화 쿼리를 유효 구좌만 조회하도록 분리. 요청당 메모리 할당 53~86%·CPU 30~56% 절감, 동기화 6~18초 → 1.3~3초, 회귀 검증 응답 차이 0건.</p>
+          <div class="ts-tech">
+            <span>Kotlin</span>
+            <span>Spring Boot</span>
+            <span>JPA/Hibernate</span>
+            <span>Redis</span>
+          </div>
+        </a>
+
+        <a href="ts-redis-readonly.html" class="ts-card">
+          <div class="ts-card-header">
+            <span class="ts-date">2026.10</span>
+            <span class="ts-tag">Redis</span>
+          </div>
+          <h3>Redis Sentinel 장애조치 후 READONLY 쓰기 실패</h3>
+          <p>Sentinel 전환 후 failover가 끝나도 일부 서비스가 옛 마스터(replica)에 붙어 쓰기가 READONLY로 실패. readFrom으로 켜진 MasterReplica 모드가 Sentinel 이벤트로만 마스터를 갱신하는 것이 원인으로, readFrom 제거와 Sentinel 주소 파드별 지정으로 3개 서비스에서 해결.</p>
+          <div class="ts-tech">
+            <span>Redis Sentinel</span>
+            <span>Lettuce</span>
+            <span>Spring Data Redis</span>
+          </div>
+        </a>
+
         <a href="ts-secrets-configdata.html" class="ts-card">
           <div class="ts-card-header">
             <span class="ts-date">2026.08</span>

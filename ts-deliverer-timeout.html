@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="광고 송출 서버 타임아웃 원인 분석 — 게재위치 선필터와 동기화 쿼리 분리로 메모리·CPU 절감">
+  <title>광고 송출 서버 타임아웃 — 선필터와 동기화 쿼리 개선 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>광고 송출 서버 타임아웃 — 선필터와 동기화 쿼리 개선</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.10 - 2026.11</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Kotlin / Spring Boot / JPA·Hibernate / Redis / PostgreSQL</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>광고 송출 서버에서 요청 타임아웃이 늘고, 같은 시간대 RDS CPU가 높게 유지됨</li>
+          <li>장애 대응 TF를 꾸려 영역을 나눠 분석했고, 요청 처리 경로와 메모리 캐시(소재) 동기화 병목을 담당</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+        <ul>
+          <li><strong>요청 처리:</strong> 요청마다 메모리에 있는 전체 소재를 응답용 DTO로 변환한 뒤 게재위치로 거르고 있어, 요청과 무관한 소재까지 매번 객체를 만들며 할당·CPU를 소모</li>
+          <li><strong>소재 동기화:</strong> 동기화 쿼리가 광고그룹의 구좌를 기간 조건 없이 전부 조인해 읽어, 종료된 과거 구좌까지 약 71만 행을 매 주기 로드</li>
+          <li><strong>Redis 조회:</strong> 블로킹 조회 상한(200ms)이 짧아 순간 지연이 생기면 요청 전체가 에러로 처리됨</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+        <div class="ts-highlight">
+          <p><strong>필요한 것만, 먼저 거르고 나서 만든다.</strong> 변환·조회 대상을 앞단에서 줄여 요청당 비용과 동기화 비용을 함께 낮춘다.</p>
+        </div>
+        <div class="ts-subsection">
+          <h4>1. 게재위치 선필터</h4>
+        <ul>
+          <li>요청한 게재위치에 해당하는 소재만 먼저 고른 뒤 DTO로 변환하도록 순서를 변경</li>
+        </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>2. 동기화 쿼리 분리</h4>
+        <ul>
+          <li>구좌는 유효 기간에 걸친 것만 별도 쿼리로 조회해 합치도록 변경</li>
+          <li>읽는 구좌 약 71만 → 3천 행</li>
+        </ul>
+        </div>
+        <div class="ts-subsection">
+          <h4>3. Redis 블로킹 상한 조정</h4>
+        <ul>
+          <li>200ms → 300ms로 조정해 순간 지연이 곧바로 요청 실패로 번지지 않도록 완화</li>
+        </ul>
+        </div>
+        <div class="ts-success">
+          <p><strong>결과:</strong></p>
+        <ul>
+          <li>운영 DB 사본 부하 측정 기준 요청당 메모리 할당 <strong>53~86%</strong>, CPU <strong>30~56%</strong> 절감, 처리량 최대 약 2배</li>
+          <li>운영 소재 동기화 시간 <strong>6~18초 → 1.3~3초</strong></li>
+          <li>활성 게재위치 139개 × 1,472요청을 5회 반복한 회귀 검증에서 변경 전후 응답 차이 0건</li>
+          <li>팀 공동 개선의 일부로 배포 후 같은 시간대 RDS CPU 67% → 29.5%</li>
+        </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>인메모리 캐시라도 요청마다 전체를 변환하면 비용이 요청 수에 비례해 커진다. 필터를 변환보다 앞에 두는 것만으로 큰 차이가 난다.</li>
+          <li>동기화 쿼리는 시간이 지날수록 쌓이는 데이터(종료된 구좌)를 기간 조건으로 끊어 두지 않으면 조용히 느려진다.</li>
+          <li>성능 개선은 응답이 바뀌지 않았다는 회귀 검증을 함께 두어야 운영에 자신 있게 반영할 수 있다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

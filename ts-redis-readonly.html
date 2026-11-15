@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Redis Sentinel 장애조치 후 replica에 남아 쓰기가 READONLY로 실패하던 문제">
+  <title>Redis Sentinel 장애조치 후 READONLY 쓰기 실패 | 황충희</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="troubleshooting.css">
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-container">
+      <a href="index.html" class="nav-logo">CH</a>
+      <ul class="nav-links">
+        <li><a href="index.html#about">About</a></li>
+        <li><a href="index.html#career">Career</a></li>
+        <li><a href="index.html#projects">Projects</a></li>
+        <li><a href="troubleshooting.html" style="color: #6366f1;">Troubleshooting</a></li>
+        <li><a href="index.html#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <section class="ts-detail-hero">
+    <div class="container">
+      <a href="troubleshooting.html" class="ts-back-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        목록으로 돌아가기
+      </a>
+      <h1>Redis Sentinel 장애조치 후 READONLY 쓰기 실패</h1>
+      <div class="ts-meta">
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>2026.10</span>
+        </div>
+        <div class="ts-meta-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Redis Sentinel / Lettuce / Spring Data Redis / Kubernetes</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="ts-detail-content">
+    <div class="container">
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">현상</h2>
+        <ul>
+          <li>개발계 Redis를 Sentinel 3노드로 전환한 뒤, 장애조치(failover)가 끝났는데도 일부 애플리케이션의 쓰기가 <code>READONLY You can't write against a read only replica</code>로 계속 실패</li>
+          <li>송출 서버와 스트림 서버 2개, 총 3개 서비스에서 같은 증상</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">원인 분석</h2>
+        <ul>
+          <li>Redis 연결 팩토리에 <code>readFrom</code>이 설정돼 Lettuce가 MasterReplica 모드로 동작</li>
+          <li>이 모드는 마스터 변경을 Sentinel 이벤트로만 반영하므로, 이벤트를 놓치면 강등된 옛 마스터(현재 replica)에 계속 쓰기를 보냄</li>
+          <li>Sentinel 주소도 headless 서비스 하나만 지정돼 있어, 해당 주소가 가리키는 Sentinel이 내려가면 다른 Sentinel로 넘어가지 못하는 구조</li>
+        </ul>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">해결책</h2>
+        <div class="ts-subsection">
+          <h4>설정 변경</h4>
+        <ul>
+          <li>연결 팩토리에서 <code>readFrom</code> 제거</li>
+          <li>Sentinel 주소를 headless 하나에서 파드별 3개로 변경</li>
+          <li>설정이 의도대로 적용되는지 확인하는 컨텍스트 테스트 추가</li>
+        </ul>
+        </div>
+        <div class="ts-success">
+          <p><strong>결과:</strong></p>
+        <ul>
+          <li>3개 서비스에 동일하게 적용해 장애조치 후 READONLY 쓰기 실패 문제 해소</li>
+        </ul>
+        </div>
+      </div>
+
+      <div class="ts-section">
+        <h2 class="ts-section-title">교훈</h2>
+        <ul>
+          <li>Sentinel 전환은 서버 쪽 failover 시간만이 아니라 클라이언트가 새 마스터를 따라가는지까지 확인해야 끝난다.</li>
+          <li>읽기 분산 옵션은 토폴로지 갱신 방식까지 바꿀 수 있으므로, 필요가 확실하지 않으면 켜지 않는다.</li>
+          <li>Sentinel 주소는 하나의 DNS 이름보다 노드별로 나열해 일부가 내려가도 조회할 수 있게 한다.</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <footer class="footer">
+    <p>2026 Chunghee Hwang. All rights reserved.</p>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>
