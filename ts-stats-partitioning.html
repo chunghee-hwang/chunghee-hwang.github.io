@@ -60,9 +60,9 @@
       <div class="ts-section">
         <h2 class="ts-section-title">현상</h2>
         <ul>
-          <li>시간(hour) 단위 통계 보고서를 <code>date</code>, <code>hour</code>로 필터링해 조회할 때 응답이 5초를 넘어가고, 전체 매체 대상 조회는 30초를 초과해 타임아웃 발생</li>
+          <li>시간(hour) 단위 통계 보고서를 <code>date</code>, <code>hour</code>로 필터링해 조회할 때 응답이 5초를 넘어가고, 전체 매체 대상 조회는 30초를 초과. 사람인 매체의 시간 단위 운영 보고서와 게재 보고서는 <strong>60초를 넘겨 ALB 유휴 제한 시간에 연결이 끊겨</strong> 결과가 나오지 않음</li>
           <li>운영 대상 테이블(prod): 총 <strong>약 3,312만 행</strong>, 테이블 15GB, <strong>인덱스 포함 43GB</strong>, 하루 평균 약 45,000행 적재</li>
-          <li>재현 쿼리(운영 보고서, 6일 조회) EXPLAIN ANALYZE 기준 <strong>5,719ms</strong>, 그중 <strong>I/O 대기가 5,279ms(95.6%)</strong>, 디스크 블록 읽기 41,510건</li>
+          <li>재현 쿼리(운영 보고서, 6일 조회) EXPLAIN ANALYZE 기준 <strong>5,719ms</strong>, 그중 <strong>I/O 대기가 5,279ms(약 92%)</strong>, 디스크 블록 읽기 41,510건</li>
         </ul>
       </div>
 
@@ -80,12 +80,54 @@
             <li>즉 SQL이 아니라 <strong>테이블 구조(물리 레이아웃)</strong> 문제 → 파티셔닝으로 스캔 대상 자체를 줄여야 함</li>
           </ul>
         </div>
+        <div class="ts-subsection">
+          <h4>근거: 조회할 행이 흩어져 블록을 약 9배 더 읽고 있었음</h4>
+          <ul>
+            <li>8KB 블록 하나에 약 17행이 들어가는데, 같은 7일 조회(123,821행)에 파티셔닝 전에는 <strong>70,418블록</strong>을 읽음</li>
+            <li>파티셔닝 후 같은 조회는 <strong>7,709블록</strong>. 행이 든 테이블 블록은 7,054개로 블록당 약 17.6행, 빈틈없이 모여 있음</li>
+          </ul>
+          <div style="margin:20px 0;padding:16px;background:#12121a;border:1px solid #2a2a38;border-radius:12px;overflow-x:auto">
+          <svg viewBox="0 0 720 190" xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans KR, sans-serif" font-size="12" style="width:100%;min-width:560px;height:auto;display:block">
+            <text x="0" y="16" fill="#f0f0f5" font-weight="700">파티셔닝 전: 테이블 하나 43GB</text>
+            <rect x="0" y="26" width="320" height="96" rx="8" fill="#1a1a24" stroke="#2a2a38"/>
+            <g fill="#2a2a38">
+              <rect x="12" y="36" width="24" height="18" rx="2"/><rect x="42" y="36" width="24" height="18" rx="2"/><rect x="72" y="36" width="24" height="18" rx="2"/><rect x="102" y="36" width="24" height="18" rx="2"/><rect x="132" y="36" width="24" height="18" rx="2"/><rect x="162" y="36" width="24" height="18" rx="2"/><rect x="192" y="36" width="24" height="18" rx="2"/><rect x="222" y="36" width="24" height="18" rx="2"/><rect x="252" y="36" width="24" height="18" rx="2"/><rect x="282" y="36" width="24" height="18" rx="2"/><rect x="12" y="62" width="24" height="18" rx="2"/><rect x="42" y="62" width="24" height="18" rx="2"/><rect x="72" y="62" width="24" height="18" rx="2"/><rect x="102" y="62" width="24" height="18" rx="2"/><rect x="132" y="62" width="24" height="18" rx="2"/><rect x="162" y="62" width="24" height="18" rx="2"/><rect x="192" y="62" width="24" height="18" rx="2"/><rect x="222" y="62" width="24" height="18" rx="2"/><rect x="252" y="62" width="24" height="18" rx="2"/><rect x="282" y="62" width="24" height="18" rx="2"/><rect x="12" y="88" width="24" height="18" rx="2"/><rect x="42" y="88" width="24" height="18" rx="2"/><rect x="72" y="88" width="24" height="18" rx="2"/><rect x="102" y="88" width="24" height="18" rx="2"/><rect x="132" y="88" width="24" height="18" rx="2"/><rect x="162" y="88" width="24" height="18" rx="2"/><rect x="192" y="88" width="24" height="18" rx="2"/><rect x="222" y="88" width="24" height="18" rx="2"/><rect x="252" y="88" width="24" height="18" rx="2"/><rect x="282" y="88" width="24" height="18" rx="2"/>
+            </g>
+            <g fill="#f87171">
+              <rect x="42" y="36" width="24" height="18" rx="2"/><rect x="192" y="36" width="24" height="18" rx="2"/><rect x="102" y="62" width="24" height="18" rx="2"/><rect x="252" y="62" width="24" height="18" rx="2"/><rect x="12" y="88" width="24" height="18" rx="2"/><rect x="162" y="88" width="24" height="18" rx="2"/><rect x="282" y="88" width="24" height="18" rx="2"/>
+            </g>
+            <text x="0" y="140" fill="#a0a0b0" font-size="11">조회할 행(빨강)이 여러 블록에 흩어짐, 대부분 디스크에서 읽음</text>
+            <text x="0" y="164" fill="#f87171" font-weight="700" font-size="13">7일 조회 70,418블록</text>
+            <text x="0" y="184" fill="#f0f0f5">보고서 60초 초과, 결과 안 나옴</text>
+            <path d="M336 74 L362 74" stroke="#a0a0b0" stroke-width="1.5"/><path d="M362 74 L355 70 L355 78 Z" fill="#a0a0b0"/>
+            <text x="376" y="16" fill="#f0f0f5" font-weight="700">파티셔닝 후: 월별 테이블</text>
+            <g fill="#1a1a24" stroke="#2a2a38">
+              <rect x="376" y="26" width="76" height="96" rx="8"/><rect x="460" y="26" width="76" height="96" rx="8"/><rect x="628" y="26" width="76" height="96" rx="8"/>
+            </g>
+            <rect x="544" y="26" width="76" height="96" rx="8" fill="rgba(99,102,241,0.15)" stroke="#6366f1" stroke-width="1.5"/>
+            <g font-size="11" text-anchor="middle"><text x="414" y="44" fill="#a0a0b0">4월</text><text x="498" y="44" fill="#a0a0b0">5월</text><text x="582" y="44" fill="#a5b4fc" font-weight="700">6월</text><text x="666" y="44" fill="#a0a0b0">7월</text></g>
+            <g fill="#6366f1"><rect x="556" y="56" width="52" height="14" rx="2"/><rect x="556" y="74" width="52" height="14" rx="2"/><rect x="556" y="92" width="26" height="14" rx="2"/></g>
+            <text x="376" y="140" fill="#a0a0b0" font-size="11">조회한 달만 읽고, 행이 모여 있음</text>
+            <text x="376" y="164" fill="#a5b4fc" font-weight="700" font-size="13">같은 조회 7,709블록, 약 9배 감소</text>
+            <text x="376" y="184" fill="#f0f0f5">사람인 보고서 2.58초, 6.41초</text>
+          </svg>
+          <p style="margin:8px 0 0;font-size:0.85rem;color:#a0a0b0">같은 조건(7일, 같은 매체, 123,821행)에서 읽은 블록 수. EXPLAIN (ANALYZE, BUFFERS), 파티셔닝 전 2026-06-15, 후 2026-11-22 운영계</p>
+        </div>
+        </div>
       </div>
 
       <div class="ts-section">
         <h2 class="ts-section-title">해결책</h2>
         <div class="ts-highlight">
           <p><strong>date 기준 월별 RANGE 파티셔닝 + 인덱스 선두 컬럼을 date로 재정렬.</strong> 조회는 항상 date 범위 조건을 포함하므로, 파티션 프루닝으로 대상 월의 파티션만 스캔하게 된다.</p>
+        </div>
+        <div class="ts-subsection">
+          <h4>검토한 대안: CLUSTER로 재배치</h4>
+          <ul>
+            <li><code>CLUSTER</code>로 행을 인덱스 순서로 다시 쓰면 쿼리 실행이 약 3.7배 빨라지는 것을 확인 (pg2, 3.5ms → 0.95ms)</li>
+            <li>하지만 실행 중 테이블 읽기와 쓰기가 잠겨 Airflow 적재를 멈춰야 하고, 새로 쌓이는 데이터는 정렬되지 않아 주기적으로 다시 돌려야 함</li>
+            <li>임시방편이라 제외하고, 재배치 효과가 계속 유지되는 월별 파티셔닝으로 결정. 운영계에 두 달치를 먼저 만들어 검증한 뒤 백엔드 챕터와 합의 (2026-06-18)</li>
+          </ul>
         </div>
         <div class="ts-subsection">
           <h4>1. 파티셔닝 및 인덱스 재설계</h4>
@@ -115,6 +157,7 @@ COMMIT;</code>
         </div>
 
         <div class="ts-success">
+          <p><strong>운영 환경 실측 (2026-11-21, 사람인 매체):</strong> 시간 단위 운영 보고서 60초 초과 → <strong>2.58초</strong>, 게재 보고서 60초 초과 → <strong>6.41초</strong></p>
           <p><strong>성능 결과 (콜드 쿼리 기준):</strong></p>
           <table style="width: 100%; border-collapse: collapse; margin-top: 12px;">
             <thead>

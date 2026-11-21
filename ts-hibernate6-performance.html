@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Hibernate 6 마이그레이션 후 API 성능 저하 해결">
+  <meta name="description" content="Spring Boot 3 전환 후 RDS CPU 100%, Hibernate 6의 JOIN 순서 변화 원인 분석과 해결">
   <title>Hibernate 6 마이그레이션 후 API 성능 저하 | 황충희</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -68,7 +68,7 @@
           <li>Spring Boot 2.7.7 → 3.2.2, Hibernate 5 → 6 마이그레이션 후 광고 송출 동기화 API의 응답 시간이 크게 저하</li>
           <li>prod 환경: <strong>1,500ms → 4,000ms (약 2.6배 저하)</strong></li>
           <li>dev 환경: 1,662ms → 3,320ms</li>
-          <li>마이그레이션 후 RDS CPU 사용량이 100%까지 치솟는 현상 발생</li>
+          <li>2026-05-07 송출 서버 배포 직후 <strong>RDS CPU가 100%</strong>까지 올라 바로 Spring Boot 2로 롤백, 다음 날 원인과 해결책을 공유하고 재배포</li>
           <li>해당 API는 33개 테이블을 JOIN하는 단일 쿼리로, 광고 송출 대상 데이터를 한 번에 로딩</li>
         </ul>
       </div>
@@ -77,12 +77,44 @@
         <h2 class="ts-section-title">원인 분석</h2>
 
         <div class="ts-subsection">
-          <h4>Hibernate 5 vs Hibernate 6 ResultSet 처리 방식 차이</h4>
+          <h4>같은 코드인데, Hibernate 6가 만든 SQL은 JOIN 순서가 달랐다</h4>
           <ul>
-            <li><strong>Hibernate 5 (TwoPhaseLoad):</strong> ResultSet에서 row 단위로 엔티티를 생성 → 212개 엔티티 materializations</li>
-            <li><strong>Hibernate 6 (ResultsHelper + SQM 엔진):</strong> 전체 ResultSet을 먼저 읽은 후 엔티티 그래프를 일괄 구성 → 961개 collection initializations</li>
+            <li>같은 QueryDSL 코드에서 나온 <strong>JPQL은 두 버전이 완전히 같았고</strong>, Hibernate가 SQL로 바꾸는 단계에서 JOIN 순서가 달라짐</li>
+            <li>Hibernate 6는 연관관계를 부모 엔티티 기준으로 묶어 SQL을 만들어, 광고에 딸린 <strong>광고그룹 경로 전체가 광고 바로 뒤로</strong> 옴</li>
+            <li>광고그룹 경로에는 판매정책, 상품스펙, 크레딧처럼 행을 곱으로 불리는 컬렉션이 몰려 있어, 중간 결과가 Hibernate 5보다 훨씬 일찍 커짐</li>
           </ul>
-          <p>33개 테이블을 JOIN하는 쿼리에서 <strong>컬렉션 fetchJoin이 Cartesian Product를 발생</strong>시켜 ResultSet 행 수가 기하급수적으로 증가. Hibernate 6의 SQM 엔진은 이 거대한 ResultSet 처리에서 Hibernate 5 대비 성능 저하가 심함.</p>
+          <div style="margin:20px 0;padding:16px;background:#12121a;border:1px solid #2a2a38;border-radius:12px;overflow-x:auto">
+          <svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans KR, sans-serif" font-size="12" style="width:100%;min-width:560px;height:auto;display:block">
+            <text x="0" y="18" fill="#f0f0f5" font-weight="700">Spring Boot 2 / Hibernate 5</text>
+            <g font-size="11.5">
+              <rect x="0" y="28" width="56" height="30" rx="6" fill="#22222e" stroke="#2a2a38"/><text x="28" y="48" text-anchor="middle" fill="#f0f0f5">소재</text>
+              <rect x="62" y="28" width="56" height="30" rx="6" fill="#22222e" stroke="#2a2a38"/><text x="90" y="48" text-anchor="middle" fill="#f0f0f5">광고</text>
+              <rect x="124" y="28" width="190" height="30" rx="6" fill="#22222e" stroke="#2a2a38"/><text x="219" y="48" text-anchor="middle" fill="#f0f0f5">게재위치 경로 (5개)</text>
+              <rect x="320" y="28" width="120" height="30" rx="6" fill="#22222e" stroke="#2a2a38"/><text x="380" y="48" text-anchor="middle" fill="#f0f0f5">콘텐츠 (3개)</text>
+              <rect x="446" y="28" width="274" height="30" rx="6" fill="rgba(248,113,113,0.15)" stroke="#f87171"/><text x="583" y="48" text-anchor="middle" fill="#fca5a5">광고그룹 경로 (9개, 행을 크게 불림)</text>
+            </g>
+            <text x="0" y="78" fill="#a0a0b0" font-size="11">행을 불리는 JOIN이 마지막에 실행됨</text>
+            <text x="0" y="114" fill="#f0f0f5" font-weight="700">Spring Boot 3 / Hibernate 6</text>
+            <g font-size="11.5">
+              <rect x="0" y="124" width="56" height="30" rx="6" fill="#22222e" stroke="#2a2a38"/><text x="28" y="144" text-anchor="middle" fill="#f0f0f5">소재</text>
+              <rect x="62" y="124" width="56" height="30" rx="6" fill="#22222e" stroke="#2a2a38"/><text x="90" y="144" text-anchor="middle" fill="#f0f0f5">광고</text>
+              <rect x="124" y="124" width="274" height="30" rx="6" fill="rgba(248,113,113,0.15)" stroke="#f87171"/><text x="261" y="144" text-anchor="middle" fill="#fca5a5">광고그룹 경로 (9개, 행을 크게 불림)</text>
+              <rect x="404" y="124" width="190" height="30" rx="6" fill="#22222e" stroke="#2a2a38"/><text x="499" y="144" text-anchor="middle" fill="#f0f0f5">게재위치 경로 (5개)</text>
+              <rect x="600" y="124" width="120" height="30" rx="6" fill="#22222e" stroke="#2a2a38"/><text x="660" y="144" text-anchor="middle" fill="#f0f0f5">콘텐츠 (3개)</text>
+            </g>
+            <text x="0" y="174" fill="#a0a0b0" font-size="11">광고에 딸린 광고그룹 경로가 광고 바로 뒤로 당겨져, 중간 결과가 일찍 커짐</text>
+            <text x="0" y="194" fill="#a0a0b0" font-size="11">같은 QueryDSL 코드, 같은 JPQL. 다른 것은 Hibernate가 SQL로 바꿀 때의 JOIN 순서</text>
+          </svg>
+          <p style="margin:8px 0 0;font-size:0.85rem;color:#a0a0b0">2026-05-07 SB2와 SB3가 생성한 SQL 비교. 구조를 같게 축소해 그림</p>
+        </div>
+        </div>
+        <div class="ts-subsection">
+          <h4>버전만 바꿔 재현: 같은 결과 행인데 5.9배 느림</h4>
+          <ul>
+            <li>운영 쿼리와 같은 JOIN 구조로 축소한 쿼리를 테스트 데이터로 만들어 PostgreSQL 16에서 EXPLAIN ANALYZE</li>
+            <li>결과 행은 두 버전 모두 <strong>1,920만</strong>으로 같은데, Spring Boot 2.7 / Hibernate 5는 <strong>50초</strong>, Spring Boot 3.2 / Hibernate 6.4는 <strong>296초</strong></li>
+            <li>재현 실험에서 중간 결과가 48만 행에서 480만 행으로 먼저 커지는 것을 확인. 테스트 데이터라 배수 자체는 운영 수치가 아님</li>
+          </ul>
         </div>
 
         <div class="ts-subsection">
@@ -132,7 +164,7 @@
             <li>13개 컬렉션 fetchJoin 제거 후, <code>Hibernate.initialize()</code>로 트랜잭션 내 강제 초기화</li>
             <li><code>default_batch_fetch_size: 100</code> 설정으로 lazy loading이 <code>WHERE id IN (?, ?, ..., ?)</code> 배치 쿼리로 실행되게 변경</li>
             <li>결과: prod <strong>4,000ms → 2,167ms (46% 개선)</strong></li>
-            <li>한방 쿼리의 WHERE 복잡도가 여전히 SQM에 부담이 되어 추가 최적화 필요</li>
+            <li>한 쿼리에 남은 복잡한 WHERE 조건과 JOIN이 여전히 무거워 추가 최적화 필요</li>
           </ul>
         </div>
       </div>
@@ -141,12 +173,29 @@
         <h2 class="ts-section-title">해결책</h2>
 
         <div class="ts-highlight">
-          <p><strong>최종 해결:</strong> 시도 4의 fetchJoin 제거 + Hibernate.initialize 전략에 <strong>쿼리 분할(ID 조회 → 엔티티 로딩)</strong>을 추가하여 SQM 부담을 최소화.</p>
+          <p><strong>최종 해결:</strong> 시도 4의 fetchJoin 제거 + Hibernate.initialize 전략에 <strong>쿼리 분할(ID 조회 → 엔티티 로딩)</strong>을 추가해, 결과 행 수와 쿼리 복잡도를 함께 줄임.</p>
+        </div>
+        <div style="margin:20px 0;padding:16px;background:#12121a;border:1px solid #2a2a38;border-radius:12px;overflow-x:auto">
+          <svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" font-family="Noto Sans KR, sans-serif" font-size="12" style="width:100%;min-width:560px;height:auto;display:block">
+            <text x="0" y="16" fill="#f0f0f5" font-weight="700">수정 전: 한 쿼리에 컬렉션을 모두 fetchJoin</text>
+            <text x="0" y="46" fill="#fca5a5" font-size="13">게재위치 20 × 콘텐츠 2 × 리소스 2 × 크레딧 5 × 판매정책 3 × 상품스펙 4 × 슬롯 2</text>
+            <text x="560" y="46" fill="#f87171" font-size="15" font-weight="700">= 9,600행</text>
+            <text x="0" y="86" fill="#f0f0f5" font-weight="700">수정 후: 나눠서 조회</text>
+            <g font-size="12">
+              <rect x="0" y="98" width="140" height="30" rx="6" fill="rgba(99,102,241,0.15)" stroke="#6366f1"/><text x="70" y="118" text-anchor="middle" fill="#f0f0f5">1 소재 ID만 조회</text>
+              <text x="146" y="118" fill="#a0a0b0">→</text>
+              <rect x="162" y="98" width="150" height="30" rx="6" fill="rgba(99,102,241,0.15)" stroke="#6366f1"/><text x="237" y="118" text-anchor="middle" fill="#f0f0f5">2 1:1 연관만 로딩</text>
+              <text x="318" y="118" fill="#a0a0b0">→</text>
+              <rect x="334" y="98" width="210" height="30" rx="6" fill="rgba(99,102,241,0.15)" stroke="#6366f1"/><text x="439" y="118" text-anchor="middle" fill="#f0f0f5">3 컬렉션은 100개씩 IN 조회</text>
+            </g>
+            <text x="560" y="118" fill="#a5b4fc" font-size="15" font-weight="700">20+2+…+2 = 38행</text>
+            <text x="0" y="146" fill="#a0a0b0" font-size="11">소재 1개를 불러올 때 결과 행 수. 재현 데이터 기준 예시이며 운영 쿼리는 컬렉션이 13개라 곱이 더 큼</text>
+          </svg>
         </div>
 
         <div class="ts-subsection">
           <h4>1단계: ID만 SELECT (엔티티 하이드레이션 없음)</h4>
-          <p>복잡한 WHERE 조건을 여기서 모두 처리. fetchJoin 없이 ID만 가져오므로 SQM 하이드레이션 비용 제로.</p>
+          <p>복잡한 WHERE 조건을 여기서 모두 처리. fetchJoin 없이 ID만 가져오므로 엔티티를 만들지 않음.</p>
           <div class="ts-code-block">
             <code>val creativeIds = queryFactory.select(creative.id)
     .from(creative)
@@ -191,9 +240,8 @@ spring.jpa.properties.hibernate.default_batch_fetch_size: 100</code>
         <div class="ts-success">
           <p><strong>성능 결과:</strong></p>
           <ul>
-            <li>prod DB: 1,500ms (SB2) → 4,000ms (SB3 직후) → <strong>~500ms (최적화 후)</strong></li>
-            <li>stg 파드 안정화 후: <strong>~350ms (235~800ms)</strong> — SB2 prod 대비 약 4배 빠름</li>
-            <li>RDS CPU 사용량: <strong>45% → 20%로 감소</strong></li>
+            <li>소재 동기화, 운영 DB 기준: 1,500ms (SB2) → 4,000ms (SB3 직후) → <strong>~1,000ms (최적화 후)</strong>. 컬렉션 분리만 했을 때 2,167ms</li>
+            <li>재배포 직후 RDS CPU 사용량: <strong>45% → 20%</strong> (2026-05-08)</li>
           </ul>
         </div>
 
@@ -215,17 +263,11 @@ spring.jpa.properties.hibernate.default_batch_fetch_size: 100</code>
                 <td style="padding: 8px;">~3,320ms</td>
                 <td style="padding: 8px;">~1,613ms</td>
               </tr>
-              <tr style="border-bottom: 1px solid #e5e7eb;">
+              <tr>
                 <td style="padding: 8px;">prod DB</td>
                 <td style="padding: 8px;">~1,500ms</td>
                 <td style="padding: 8px;">~4,000ms</td>
-                <td style="padding: 8px;"><strong>~500ms</strong></td>
-              </tr>
-              <tr>
-                <td style="padding: 8px;">stg 파드 (안정화)</td>
-                <td style="padding: 8px;">-</td>
-                <td style="padding: 8px;">-</td>
-                <td style="padding: 8px;"><strong>~350ms</strong></td>
+                <td style="padding: 8px;"><strong>~1,000ms</strong></td>
               </tr>
             </tbody>
           </table>
@@ -235,11 +277,11 @@ spring.jpa.properties.hibernate.default_batch_fetch_size: 100</code>
       <div class="ts-section">
         <h2 class="ts-section-title">교훈</h2>
         <ul>
-          <li>Hibernate 6 SQM 엔진은 ResultSet을 일괄 구성하므로, 컬렉션 fetchJoin이 많은 쿼리는 Hibernate 5보다 성능 페널티가 큽니다. 마이그레이션 시 성능 회귀 검증이 필수입니다.</li>
+          <li>Hibernate 6는 같은 JPQL이라도 생성 SQL의 JOIN 순서가 달라질 수 있습니다. 마이그레이션 때는 결과만 보지 말고 생성 SQL과 실행 계획을 버전별로 비교해야 합니다.</li>
           <li>"fetchJoin이 곧 N+1 회피"라는 통념은 Hibernate 6에서 위험합니다. 컬렉션 fetchJoin은 Cartesian Product 비용을 먼저 따져야 합니다.</li>
           <li>단일 엔티티 fetchJoin(ManyToOne/OneToOne)은 행 수를 늘리지 않으므로 유지하는 것이 낫습니다. lazy로 전환하면 추가 SELECT가 발생해 오히려 악화될 수 있습니다.</li>
           <li>WHERE 조건으로 필터링하는 컬렉션은 lazy loading으로 전환할 수 없습니다. 이런 컬렉션은 fetchJoin을 유지하되, 다른 컬렉션은 <code>Hibernate.initialize() + default_batch_fetch_size</code> 조합으로 처리하는 것이 효과적입니다.</li>
-          <li>복잡한 한방 쿼리는 <strong>ID 조회 → 엔티티 로딩</strong>의 2단계 분할이 SQM 부담을 크게 줄입니다. WHERE 복잡도와 엔티티 하이드레이션을 분리하면 두 단계 모두 가벼워집니다.</li>
+          <li>복잡한 한방 쿼리는 <strong>ID 조회 → 엔티티 로딩</strong>으로 나누면, 복잡한 필터링과 엔티티 조립이 분리되어 두 단계 모두 가벼워집니다.</li>
         </ul>
       </div>
 

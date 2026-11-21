@@ -299,7 +299,7 @@
                   <span class="project-period">2026.06</span>
                 </div>
                 <div class="project-details">
-                  <p>약 3,300만 행(인덱스 포함 43GB) 통계 테이블에서 시간 단위 조회가 최대 30초를 넘던 문제를 해결. 인덱스는 최적이나 테이블 크기가 메모리 버퍼에 상주하지 못해 콜드 쿼리 시 대량 랜덤 I/O가 병목이었고, date 기준 월별 RANGE 파티셔닝(파티션 프루닝)과 인덱스 컬럼 재정렬로 해결. 신규 파티션 테이블에 멱등 사전 복사 후 테이블명을 트랜잭션 내에서 스왑해 서비스 영향 없이 전환하고, 2년 경과 데이터 삭제를 파티션 DROP으로 자동화. 콜드 쿼리 기준 보고서 조회 14.3초 → 0.34초(최대 42배) 개선.</p>
+                  <p>약 3,300만 행(인덱스 포함 43GB) 통계 테이블에서 시간 단위 보고서가 60초를 넘겨 ALB에서 끊기던 문제를 해결. 인덱스는 최적이나 테이블 크기가 메모리 버퍼에 상주하지 못해 콜드 쿼리 시 대량 랜덤 I/O가 병목이었고, date 기준 월별 RANGE 파티셔닝(파티션 프루닝)과 인덱스 컬럼 재정렬로 해결. 신규 파티션 테이블에 멱등 사전 복사 후 테이블명을 트랜잭션 내에서 스왑해 서비스 영향 없이 전환하고, 2년 경과 데이터 삭제를 파티션 DROP으로 자동화. 운영 실측 기준 사람인 시간 단위 보고서 60초 초과 → 2.58초, 6.41초, 같은 조회의 읽는 블록 70,418 → 7,709.</p>
                   <div class="project-tech">
                     <span>PostgreSQL</span><span>RANGE Partitioning</span><span>JPA</span><span>QueryDSL</span><span>Airflow</span>
                   </div>
@@ -377,7 +377,7 @@
                   <span class="project-period">2026.05</span>
                 </div>
                 <div class="project-details">
-                  <p>Spring Boot 3.2.2 마이그레이션 후 광고 송출 동기화 API의 응답 시간이 prod 기준 1,500ms에서 4,000ms로 약 2.6배 저하된 문제를 해결. 원인은 Hibernate 6 SQM 엔진이 컬렉션 fetchJoin의 Cartesian Product를 처리하는 비용이 급증한 것으로, 33개 테이블 한방 쿼리를 ID 조회 → 엔티티 로딩 2단계로 분할하고 컬렉션은 Hibernate.initialize() + batch fetch로 지연 초기화하여 prod 응답 시간 ~500ms 달성(SB2 대비 약 3배 빠름). 배포 후 RDS CPU 사용량 45% → 20%로 감소.</p>
+                  <p>Spring Boot 3.2.2 마이그레이션 후 광고 송출 동기화 API의 응답 시간이 prod 기준 1,500ms에서 4,000ms로 약 2.6배 저하된 문제를 해결. 배포 직후 RDS CPU 100%로 롤백한 뒤, 같은 JPQL인데 Hibernate 6가 만든 SQL의 JOIN 순서가 바뀌어 행을 곱으로 불리는 JOIN이 먼저 실행된 것을 원인으로 찾고 버전만 바꾼 재현(50초 → 296초)으로 확인. 33개 테이블 한방 쿼리를 ID 조회 → 엔티티 로딩 2단계로 분할하고 컬렉션은 Hibernate.initialize() + batch fetch로 지연 초기화하여 다음 날 재배포, 운영 DB 기준 4,000ms → 약 1,000ms, RDS CPU 45% → 20%.</p>
                   <div class="project-tech">
                     <span>Hibernate 6</span><span>QueryDSL</span><span>Spring Boot</span><span>Kotlin</span><span>PostgreSQL</span>
                   </div>
